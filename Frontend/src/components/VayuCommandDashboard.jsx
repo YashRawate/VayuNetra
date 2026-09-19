@@ -834,7 +834,7 @@ export default function VayuCommandDashboard() {
               </div>
             </div>
           </div>
-        </div>
+        )}
 
       </main>
 

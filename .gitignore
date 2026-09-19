@@ -11,6 +11,15 @@ node_modules
 dist
 dist-ssr
 *.local
+Frontend.zip
+
+# Python & Data
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.nc
+*.db
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +31,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+

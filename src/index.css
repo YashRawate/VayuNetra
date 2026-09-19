@@ -1,86 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@500;600;700;800;900&display=swap');
 @import "tailwindcss";
+
+:root {
+  --bg-light: #f8fafc;
+  --panel-light: #ffffff;
+  --card-light: #ffffff;
+  --border-light: #e2e8f0;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --accent-emerald: #059669;
+  --accent-amber: #d97706;
+  --accent-purple: #7c3aed;
+}
 
 @layer base {
   body {
-    background-color: #f3f6fb;
-    color: #1e293b;
-    font-family: 'Plus Jakarta Sans', 'Hanken Grotesk', -apple-system, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
     margin: 0;
     padding: 0;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+    color: #0f172a;
   }
 }
 
-@keyframes subtle-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(1.15); }
+/* Light Command Center Panel Classes */
+.dark-panel, .light-panel {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
 }
 
-@keyframes radar-ring {
-  0% { transform: scale(0.85); opacity: 0.8; }
-  100% { transform: scale(2.4); opacity: 0; }
+.dark-card, .light-card {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
 }
 
-@keyframes wind-drift {
-  0% { stroke-dashoffset: 320; }
-  100% { stroke-dashoffset: 0; }
+/* Emerald Mint Primary CTA Button */
+.btn-emerald {
+  background-color: #059669;
+  color: #ffffff;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
 }
 
-.animate-radar-ring {
-  animation: radar-ring 2.8s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+.btn-emerald:hover {
+  background-color: #047857;
+  box-shadow: 0 4px 14px rgba(4, 120, 87, 0.35);
+  transform: translateY(-1px);
 }
 
-.animate-radar-ring-delayed {
-  animation: radar-ring 2.8s cubic-bezier(0, 0.2, 0.8, 1) infinite 1.4s;
+/* Leaflet Container explicit sizing & z-index */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 10px;
+  background: #f1f5f9 !important;
+  z-index: 10;
 }
 
-.wind-vector-stream {
-  stroke-dasharray: 8 6;
-  animation: wind-drift 10s linear infinite;
-}
-
-.wind-vector-stream-slow {
-  stroke-dasharray: 6 8;
-  animation: wind-drift 14s linear infinite;
-}
-
-.glass-surface {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.glass-surface-trans {
-  background: rgba(255, 255, 255, 0.80);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.shadow-subtle {
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
-}
-
-.shadow-glow-danger {
-  box-shadow: 0 0 15px -2px rgba(225, 29, 72, 0.45);
-}
-
-.shadow-glow-amber {
-  box-shadow: 0 0 15px -2px rgba(245, 158, 11, 0.4);
-}
-
-/* Custom scrollbar */
+/* Custom scrollbars for light panel */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f5f9;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
