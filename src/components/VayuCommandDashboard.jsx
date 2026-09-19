@@ -999,10 +999,9 @@ export default function VayuCommandDashboard() {
                   <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block font-mono">
                     Advisory Status
                   </span>
-                  <div className="bg-rose-50 border border-rose-200/80 p-1.5 rounded-lg">
+                  <div className="bg-rose-50 border border-rose-100 p-2 rounded-lg mt-1">
                     <p className="text-[10px] font-semibold text-rose-800 leading-tight">
-                      Emergency Protocol: Restrict all BS-III/IV diesel vehicles
-                      & suspend primary schools.
+                      {getAdvisory(activeHotspot.tag)}
                     </p>
                   </div>
                 </div>
@@ -1010,118 +1009,92 @@ export default function VayuCommandDashboard() {
             </div>
           </div>
 
-          {/* Chemical Speciation Bars */}
+          {/* Quick Speciation Snapshot */}
           <div
             onClick={() => setIsAqiModalOpen(true)}
-            className="bg-white rounded-2xl p-4 border border-slate-200 shadow-subtle cursor-pointer hover:shadow-md hover:border-rose-300 transition group relative"
+            className="bg-white rounded-2xl p-4 border border-slate-200 shadow-subtle cursor-pointer hover:shadow-md transition relative group"
           >
-            <div className="absolute top-3 right-3 text-slate-300 group-hover:text-rose-500 transition">
+            <div className="absolute top-3 right-3 text-slate-300 group-hover:text-slate-500 transition">
               <i className="fa-solid fa-expand"></i>
             </div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <i className="fa-solid fa-flask-vial text-slate-400 text-xs"></i>
-                <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <i className="fa-solid fa-flask text-slate-500 text-xs"></i>
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
                   Chemical Speciation
-                </h2>
+                </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400 font-semibold">
+              <span className="text-[10px] font-mono text-slate-400">
                 24h Rolling Mean
               </span>
             </div>
-            <div className="space-y-3">
-              {/* PM 2.5 */}
-              <div>
-                <div className="flex justify-between items-baseline text-xs mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900">PM 2.5</span>
-                    <span className="text-[9px] font-mono font-bold bg-rose-100 text-rose-800 px-1 py-0.2 rounded">
-                      5.2x limit
-                    </span>
+
+            <div className="space-y-3 mt-4">
+              {[
+                {
+                  name: "PM 2.5",
+                  val: pm25Val,
+                  unit: "/ 60 µg/m³",
+                  limit: `${(pm25Val / 60).toFixed(1)}x limit`,
+                  pct: `${pm25Pct}%`,
+                  bar: "from-rose-600 to-rose-500",
+                  badge: "bg-rose-100 text-rose-800",
+                },
+                {
+                  name: "PM 10",
+                  val: pm10Val,
+                  unit: "/ 100 µg/m³",
+                  limit: `${(pm10Val / 100).toFixed(1)}x limit`,
+                  pct: `${pm10Pct}%`,
+                  bar: "from-red-700 to-red-500",
+                  badge: "bg-red-100 text-red-800",
+                },
+                {
+                  name: "NO₂",
+                  val: no2Val,
+                  unit: "/ 80 µg/m³",
+                  limit: `${(no2Val / 80).toFixed(1)}x limit`,
+                  pct: `${no2Pct}%`,
+                  bar: "from-amber-500 to-yellow-400",
+                  badge: "bg-amber-100 text-amber-800",
+                },
+                {
+                  name: "CO",
+                  val: coVal,
+                  unit: "/ 2.0 mg/m³",
+                  limit: `${(parseFloat(coVal) / 2.0).toFixed(1)}x limit`,
+                  pct: `${coPct}%`,
+                  bar: "from-amber-600 to-amber-400",
+                  badge: "bg-orange-100 text-orange-800",
+                },
+              ].map((p, i) => (
+                <div key={i}>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-slate-900">
+                        {p.name}
+                      </span>
+                      <span
+                        className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${p.badge}`}
+                      >
+                        {p.limit}
+                      </span>
+                    </div>
+                    <div className="text-[10px]">
+                      <span className="font-bold text-slate-900">{p.val}</span>
+                      <span className="text-slate-400 font-mono ml-1">
+                        {p.unit}
+                      </span>
+                    </div>
                   </div>
-                  <span className="font-mono font-bold text-rose-700">
-                    {pm25Val}{" "}
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      / 60 µg/m³
-                    </span>
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-rose-600 h-full rounded-full"
-                    style={{ width: "88%" }}
-                  ></div>
-                </div>
-              </div>
-              {/* PM 10 */}
-              <div>
-                <div className="flex justify-between items-baseline text-xs mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900">PM 10</span>
-                    <span className="text-[9px] font-mono font-bold bg-red-100 text-red-800 px-1 py-0.2 rounded">
-                      4.1x limit
-                    </span>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${p.bar}`}
+                      style={{ width: p.pct }}
+                    ></div>
                   </div>
-                  <span className="font-mono font-bold text-red-700">
-                    {pm10Val}{" "}
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      / 100 µg/m³
-                    </span>
-                  </span>
                 </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-red-700 h-full rounded-full"
-                    style={{ width: `${pm10Pct}%` }}
-                  ></div>
-                </div>
-              </div>
-              {/* NO2 */}
-              <div>
-                <div className="flex justify-between items-baseline text-xs mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900">NO₂</span>
-                    <span className="text-[9px] font-mono font-bold bg-amber-100 text-amber-800 px-1 py-0.2 rounded">
-                      0.8x limit
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-amber-600">
-                    {no2Val}{" "}
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      / 80 µg/m³
-                    </span>
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-amber-500 h-full rounded-full"
-                    style={{ width: `${no2Pct}%` }}
-                  ></div>
-                </div>
-              </div>
-              {/* Carbon Monoxide (CO) */}
-              <div>
-                <div className="flex justify-between items-baseline text-xs mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900">CO</span>
-                    <span className="text-[9px] font-mono font-bold bg-amber-100 text-amber-800 px-1 py-0.2 rounded">
-                      1.4x limit
-                    </span>
-                  </div>
-                  <span className="font-mono font-bold text-amber-700">
-                    {coVal}{" "}
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      / 2.0 mg/m³
-                    </span>
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-amber-600 h-full rounded-full"
-                    style={{ width: `${coPct}%` }}
-                  ></div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -1138,194 +1111,180 @@ export default function VayuCommandDashboard() {
                 WRF-Chem Model
               </span>
             </div>
+
             {/* Color-Graded Forecast Histogram Columns */}
             <div className="flex items-end justify-between h-24 pt-4 px-1 gap-2 border-b border-slate-100">
-              {/* Col 1: Now */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
-                <span className="text-[10px] font-mono font-bold text-red-700 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  {activeHotspot.aqi}
-                </span>
+              {[
+                {
+                  time: "Now",
+                  val: activeHotspot.aqi,
+                  color: getGaugeColor(activeHotspot.tag),
+                },
+                {
+                  time: "+12h",
+                  val: Math.round(activeHotspot.aqi * 1.1),
+                  color: getGaugeColor(hotspots[0].tag),
+                },
+                {
+                  time: "+24h",
+                  val: Math.round(activeHotspot.aqi * 0.95),
+                  color: getGaugeColor(hotspots[2].tag),
+                },
+                {
+                  time: "+36h",
+                  val: Math.round(activeHotspot.aqi * 0.8),
+                  color: getGaugeColor(hotspots[3].tag),
+                },
+                {
+                  time: "+48h",
+                  val: Math.round(activeHotspot.aqi * 0.6),
+                  color: getGaugeColor(hotspots[4].tag),
+                },
+                {
+                  time: "+72h",
+                  val: Math.round(activeHotspot.aqi * 0.4),
+                  color: "#10b981",
+                },
+              ].map((fc, i) => (
                 <div
-                  className="w-full bg-red-700 rounded-t-md transition-all group-hover:brightness-110"
-                  style={{ height: "82%" }}
-                ></div>
-                <span className="text-[10px] font-mono font-bold text-slate-600 mt-2">
-                  Now
-                </span>
-              </div>
-              {/* Col 2: +12h */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
-                <span className="text-[10px] font-mono font-bold text-purple-900 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  415
-                </span>
-                <div
-                  className="w-full bg-purple-900 rounded-t-md transition-all group-hover:brightness-110"
-                  style={{ height: "94%" }}
-                ></div>
-                <span className="text-[10px] font-mono text-slate-400 mt-2">
-                  +12h
-                </span>
-              </div>
-              {/* Col 3: +24h */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
-                <span className="text-[10px] font-mono font-bold text-red-700 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  390
-                </span>
-                <div
-                  className="w-full bg-red-600 rounded-t-md transition-all group-hover:brightness-110"
-                  style={{ height: "84%" }}
-                ></div>
-                <span className="text-[10px] font-mono text-slate-400 mt-2">
-                  +24h
-                </span>
-              </div>
-              {/* Col 4: +36h */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
-                <span className="text-[10px] font-mono font-bold text-orange-600 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  310
-                </span>
-                <div
-                  className="w-full bg-orange-500 rounded-t-md transition-all group-hover:brightness-110"
-                  style={{ height: "60%" }}
-                ></div>
-                <span className="text-[10px] font-mono text-slate-400 mt-2">
-                  +36h
-                </span>
-              </div>
-              {/* Col 5: +48h (Relief Begins) */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
-                <span className="text-[10px] font-mono font-bold text-amber-600 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  240
-                </span>
-                <div
-                  className="w-full bg-amber-400 rounded-t-md transition-all group-hover:brightness-110"
-                  style={{ height: "48%" }}
-                ></div>
-                <span className="text-[10px] font-mono text-slate-400 mt-2">
-                  +48h
-                </span>
-              </div>
-              {/* Col 6: +72h (Clearance) */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
-                <span className="text-[10px] font-mono font-bold text-emerald-600 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  190
-                </span>
-                <div
-                  className="w-full bg-emerald-500 rounded-t-md transition-all group-hover:brightness-110"
-                  style={{ height: "36%" }}
-                ></div>
-                <span className="text-[10px] font-mono text-slate-400 mt-2">
-                  +72h
-                </span>
-              </div>
+                  key={i}
+                  className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer"
+                >
+                  <span
+                    className="text-[10px] font-mono font-bold mb-1 opacity-0 group-hover:opacity-100 transition"
+                    style={{ color: fc.color }}
+                  >
+                    {fc.val}
+                  </span>
+                  <div
+                    className="w-full rounded-t-md transition-all group-hover:brightness-110"
+                    style={{
+                      height: `${Math.min(100, Math.max(10, (fc.val / 500) * 100))}%`,
+                      backgroundColor: fc.color,
+                    }}
+                  ></div>
+                  <span
+                    className={`text-[10px] font-mono mt-2 ${i === 0 ? "font-bold text-slate-600" : "text-slate-400"}`}
+                  >
+                    {fc.time}
+                  </span>
+                </div>
+              ))}
             </div>
-            <p className="text-[10px] text-slate-400 mt-2 text-center font-medium">
-              <i className="fa-solid fa-cloud-bolt text-indigo-400 mr-1"></i>
-              Western disturbance shear expected Fri afternoon (+48h) to clear
-              inversion.
-            </p>
+
+            <div className="mt-3 flex items-start gap-2 px-1">
+              <i className="fa-solid fa-cloud-showers-heavy text-blue-500 mt-0.5"></i>
+              <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                Western disturbance shear expected Fri afternoon (+48h) to clear
+                inversion.
+              </p>
+            </div>
           </div>
 
-          {/* Immediate Enforcement Actions */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-subtle flex-1 flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <i className="fa-solid fa-bolt text-rose-600 text-xs"></i>
+          {/* Immediate Interventions Section */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-subtle flex-1">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-1.5">
+                <i className="fa-solid fa-bolt text-rose-500 text-xs"></i>
                 <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
                   Immediate Interventions
                 </h2>
               </div>
-              <span className="text-[10px] font-mono text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">
+              <span className="text-[10px] font-mono bg-rose-50 text-rose-700 px-2 py-0.5 rounded font-bold border border-rose-100">
                 4 Flagged
               </span>
             </div>
-            <div className="space-y-2">
-              {/* Action 1: Anand Vihar ISBT */}
+
+            <div className="space-y-2.5">
+              {/* Action 1: Dynamic Hotspot */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                    1
-                  </span>
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      Anand Vihar ISBT
+                  <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                    <i className="fa-solid fa-truck-droplet text-xs"></i>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-extrabold text-slate-800">
+                      {activeHotspot.label} Core
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">
-                      Anti-smog mobile saturation
+                      Deploy Anti-Smog Guns
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={() =>
-                    handleAction(1, "Deploy Smog Guns to Anand Vihar")
+                    handleAction(
+                      1,
+                      `Deploy Smog Guns to ${activeHotspot.label}`,
+                    )
                   }
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition shadow-xs ${
-                    actionsTriggered[1]
-                      ? "bg-emerald-600 text-white"
-                      : "bg-slate-900 text-white hover:bg-rose-600"
-                  }`}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition shadow-xs ${actionsTriggered[1] ? "bg-emerald-500 text-white hover:bg-emerald-600" : "bg-white border border-slate-200 text-rose-600 hover:border-rose-300 hover:bg-rose-50"}`}
                 >
-                  {actionsTriggered[1]
-                    ? "Squad Dispatched"
-                    : "Deploy Smog Guns"}
+                  {actionsTriggered[1] ? (
+                    <>
+                      <i className="fa-solid fa-check mr-1.5"></i>Deployed
+                    </>
+                  ) : (
+                    "Deploy"
+                  )}
                 </button>
               </div>
 
-              {/* Action 2: Patparganj Depot */}
+              {/* Action 2 */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                    2
-                  </span>
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      Patparganj Depot
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <i className="fa-solid fa-fire-ban text-xs"></i>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-extrabold text-slate-800">
+                      Biomass Burning
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">
-                      Heavy diesel truck cordon
+                      Dispatch MCD Patrols
                     </span>
                   </div>
                 </div>
                 <button
-                  onClick={() =>
-                    handleAction(2, "Reroute Diesel Trucks at Patparganj")
-                  }
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition shadow-xs ${
-                    actionsTriggered[2]
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                  }`}
+                  onClick={() => handleAction(2, "Dispatch Patrols")}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition shadow-xs ${actionsTriggered[2] ? "bg-emerald-500 text-white hover:bg-emerald-600" : "bg-white border border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-slate-100"}`}
                 >
-                  {actionsTriggered[2] ? "Traffic Rerouted" : "Reroute Trucks"}
+                  {actionsTriggered[2] ? (
+                    <>
+                      <i className="fa-solid fa-check mr-1.5"></i>Active
+                    </>
+                  ) : (
+                    "Dispatch"
+                  )}
                 </button>
               </div>
 
-              {/* Action 3: Bawana Industrial */}
+              {/* Action 3 */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-slate-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                    3
-                  </span>
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      Bawana Industrial
+                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+                    <i className="fa-solid fa-road-barrier text-xs"></i>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-extrabold text-slate-800">
+                      Heavy Vehicles
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">
-                      Approved fuel compliance audit
+                      Issue Entry Ban Alert
                     </span>
                   </div>
                 </div>
                 <button
-                  onClick={() =>
-                    handleAction(3, "Squad Compliance Audit at Bawana")
-                  }
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition shadow-xs ${
-                    actionsTriggered[3]
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-                  }`}
+                  onClick={() => handleAction(3, "Issue Border Ban Alert")}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition shadow-xs ${actionsTriggered[3] ? "bg-emerald-500 text-white hover:bg-emerald-600" : "bg-slate-800 text-white hover:bg-slate-700"}`}
                 >
-                  {actionsTriggered[3] ? "Audit Active" : "Squad Audit"}
+                  {actionsTriggered[3] ? (
+                    <>
+                      <i className="fa-solid fa-check mr-1.5"></i>Issued
+                    </>
+                  ) : (
+                    "Issue Ban"
+                  )}
                 </button>
               </div>
             </div>
