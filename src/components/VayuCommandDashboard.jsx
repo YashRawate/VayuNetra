@@ -547,10 +547,10 @@ export default function VayuCommandDashboard() {
                   </div>
                   <div className="text-right">
                     <span className="text-2xl font-black font-mono text-rose-700 leading-none">
-                      387
+                      {activeHotspot.aqi}
                     </span>
                     <span className="block text-[9px] font-extrabold text-rose-800 uppercase tracking-widest mt-0.5">
-                      SEVERE
+                      {activeHotspot.tag}
                     </span>
                   </div>
                 </div>
@@ -971,17 +971,17 @@ export default function VayuCommandDashboard() {
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                     fill="none"
                     stroke="currentColor"
-                    strokeDasharray="77.4, 100"
+                    strokeDasharray={`${gaugeArc}, 100`}
                     strokeLinecap="round"
                     strokeWidth="3.6"
                   ></path>
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center text-center">
                   <span className="text-3xl font-black font-mono text-slate-900 tracking-tight leading-none">
-                    387
+                    {activeHotspot.aqi}
                   </span>
                   <span className="text-[9px] font-extrabold text-red-700 uppercase mt-0.5 tracking-wider">
-                    SEVERE
+                    {activeHotspot.tag}
                   </span>
                 </div>
               </div>
@@ -992,7 +992,7 @@ export default function VayuCommandDashboard() {
                     Peak Hotspot
                   </span>
                   <p className="text-xs font-extrabold text-slate-900">
-                    Anand Vihar (452)
+                    {activeHotspot.label} ({activeHotspot.aqi})
                   </p>
                 </div>
                 <div>
@@ -1040,7 +1040,7 @@ export default function VayuCommandDashboard() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-rose-700">
-                    312{" "}
+                    {pm25Val}{" "}
                     <span className="text-[10px] text-slate-400 font-normal">
                       / 60 µg/m³
                     </span>
@@ -1063,7 +1063,7 @@ export default function VayuCommandDashboard() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-red-700">
-                    410{" "}
+                    {pm10Val}{" "}
                     <span className="text-[10px] text-slate-400 font-normal">
                       / 100 µg/m³
                     </span>
@@ -1072,7 +1072,7 @@ export default function VayuCommandDashboard() {
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div
                     className="bg-red-700 h-full rounded-full"
-                    style={{ width: "92%" }}
+                    style={{ width: `${pm10Pct}%` }}
                   ></div>
                 </div>
               </div>
@@ -1086,7 +1086,7 @@ export default function VayuCommandDashboard() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-amber-600">
-                    68{" "}
+                    {no2Val}{" "}
                     <span className="text-[10px] text-slate-400 font-normal">
                       / 80 µg/m³
                     </span>
@@ -1095,7 +1095,7 @@ export default function VayuCommandDashboard() {
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div
                     className="bg-amber-500 h-full rounded-full"
-                    style={{ width: "65%" }}
+                    style={{ width: `${no2Pct}%` }}
                   ></div>
                 </div>
               </div>
@@ -1109,7 +1109,7 @@ export default function VayuCommandDashboard() {
                     </span>
                   </div>
                   <span className="font-mono font-bold text-amber-700">
-                    2.8{" "}
+                    {coVal}{" "}
                     <span className="text-[10px] text-slate-400 font-normal">
                       / 2.0 mg/m³
                     </span>
@@ -1118,7 +1118,7 @@ export default function VayuCommandDashboard() {
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                   <div
                     className="bg-amber-600 h-full rounded-full"
-                    style={{ width: "70%" }}
+                    style={{ width: `${coPct}%` }}
                   ></div>
                 </div>
               </div>
@@ -1143,7 +1143,7 @@ export default function VayuCommandDashboard() {
               {/* Col 1: Now */}
               <div className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer">
                 <span className="text-[10px] font-mono font-bold text-red-700 mb-1 opacity-0 group-hover:opacity-100 transition">
-                  387
+                  {activeHotspot.aqi}
                 </span>
                 <div
                   className="w-full bg-red-700 rounded-t-md transition-all group-hover:brightness-110"
@@ -1374,7 +1374,7 @@ export default function VayuCommandDashboard() {
                     Detailed AQI & Chemical Speciation
                   </h3>
                   <p className="text-[10px] text-slate-400 font-medium">
-                    Delhi NCR Airshed · CPCB Telemetry · Live Data
+                    {activeHotspot.label} Station · CPCB Telemetry · Live Data
                   </p>
                 </div>
               </div>
@@ -1436,10 +1436,10 @@ export default function VayuCommandDashboard() {
                     </svg>
                     <div className="absolute flex flex-col items-center justify-center text-center">
                       <span className="text-4xl font-black font-mono text-slate-900 leading-none">
-                        387
+                        {activeHotspot.aqi}
                       </span>
                       <span className="text-[9px] font-extrabold text-red-700 uppercase mt-1 tracking-widest bg-red-50 px-2 py-0.5 rounded-full">
-                        SEVERE
+                        {activeHotspot.tag}
                       </span>
                     </div>
                   </div>
