@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CleanAir — Delhi NCR Air Quality Forecast</title>
+
+<!-- Tailwind CSS (CDN, no build step needed) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          aqi: {
+            good: '#22c55e', satisfactory: '#84cc16', moderate: '#eab308',
+            poor: '#f97316', verypoor: '#ef4444', severe: '#b91c1c',
+          },
+          brand: { DEFAULT: '#0b5fa3', dark: '#083f6e' }
+        },
+        fontFamily: { sans: ['Inter', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Leaflet (real map, free CartoDB tiles, no API key) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Chart.js for the 72-hour forecast line chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+  body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+  .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+  /* ── Glassmorphism Card ── */
+  .card {
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.06), 0 0 0 1px rgba(255,255,255,0.3) inset;
+    transition: box-shadow 0.25s ease, transform 0.2s ease;
+  }
+  .card:hover { box-shadow: 0 12px 28px rgba(15,23,42,0.1); transform: translateY(-1px); }
+  .dark .card {
+    background: rgba(15,23,42,0.72);
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  }
+
+  /* ── Sidebar ── */
+  aside {
+    background: rgba(255,255,255,0.60);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(226,232,240,0.8);
+  }
+  .dark aside {
+    background: rgba(9,14,28,0.80);
+    border-right: 1px solid rgba(30,41,59,0.9);
+  }
+
+  /* ── Stat Mini-Cards in Weather ── */
+  .stat-tile {
+    background: rgba(248,250,252,0.9);
+    border: 1px solid rgba(226,232,240,0.7);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 0.2s;
+  }
+  .stat-tile:hover { background: rgba(241,245,249,1); }
+  .dark .stat-tile { background: rgba(30,41,59,0.7); border-color: rgba(51,65,85,0.6); }
+  .dark .stat-tile:hover { background: rgba(30,41,59,0.95); }
+
+  /* ── Pollutant Bar ── */
+  .pollutant-bar-bg { height: 5px; border-radius: 99px; background: rgba(226,232,240,0.8); overflow: hidden; margin-top: 4px; }
+  .dark .pollutant-bar-bg { background: rgba(51,65,85,0.6); }
+  .pollutant-bar-fill { height: 100%; border-radius: 99px; transition: width 1.2s cubic-bezier(.22,1,.36,1); width: 0%; }
+
+  /* ── Map ── */
+  #map { height: 390px; border-radius: 16px; z-index: 0; }
+  .leaflet-popup-content-wrapper { border-radius: 14px; backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+  .leaflet-control-attribution { display: none !important; }
+
+  /* ── Live dot ── */
+  @keyframes pulseDot { 0%,100%{opacity:1}50%{opacity:.3} }
+  .live-dot { animation: pulseDot 2s ease-in-out infinite; }
+
+  /* ── Pulsing ring for map markers ── */
+  @keyframes ring { 0%{transform:scale(.6);opacity:.6}100%{transform:scale(2.4);opacity:0} }
+
+  /* ── Ambient blobs ── */
+  @keyframes blob {
+    0%   { transform: translate(0,0) scale(1); }
+    33%  { transform: translate(40px,-60px) scale(1.12); }
+    66%  { transform: translate(-25px,25px) scale(0.88); }
+    100% { transform: translate(0,0) scale(1); }
+  }
+  .animate-blob { animation: blob 9s infinite ease-in-out; }
+  .delay-2 { animation-delay: 2.5s; }
+  .delay-4 { animation-delay: 4.5s; }
+
+  /* ── Icon badge ── */
+  .icon-badge { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  /* ── Smooth global transitions ── */
+  * { transition-property: background-color, border-color, color; transition-duration: 200ms; transition-timing-function: ease; }
+  /* ── Atmospheric Inversion Animations ── */
+  @keyframes heatShimmer {
+    0%,100% { transform: translateX(-100%) skewX(-15deg); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateX(200%) skewX(-15deg); opacity: 0; }
+  }
+  @keyframes floatUp {
+    0% { transform: translateY(0) scale(1); opacity: 0.7; }
+    100% { transform: translateY(-28px) scale(0.5); opacity: 0; }
+  }
+  @keyframes flowLeft {
+    0% { transform: translateX(0) scaleY(1); }
+    50% { transform: translateX(-8px) scaleY(1.05); }
+    100% { transform: translateX(0) scaleY(1); }
+  }
+  @keyframes invertPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
+  }
+  .heat-shimmer { animation: heatShimmer 3s ease-in-out infinite; }
+  .float-particle { animation: floatUp 2s ease-out infinite; }
+  .flow-left { animation: flowLeft 4s ease-in-out infinite; }
+  .invert-pulse { animation: invertPulse 2s ease-in-out infinite; }
+
+  /* ── Leaflet full attribution hide ── */
+  .leaflet-control-attribution, .leaflet-control-attribution a { display: none !important; }
+  .leaflet-bottom.leaflet-right { display: none !important; }
+</style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-100 via-blue-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-800 dark:text-slate-100 min-h-screen relative">
+
+<!-- Ambient decorative blobs -->
+<div class="fixed -top-32 -right-32 w-96 h-96 bg-blue-400 dark:bg-blue-600 rounded-full filter blur-3xl opacity-20 animate-blob pointer-events-none -z-10"></div>
+<div class="fixed top-1/2 -left-32 w-80 h-80 bg-purple-400 dark:bg-purple-700 rounded-full filter blur-3xl opacity-15 animate-blob delay-2 pointer-events-none -z-10"></div>
+<div class="fixed bottom-10 right-1/4 w-72 h-72 bg-cyan-300 dark:bg-cyan-700 rounded-full filter blur-3xl opacity-15 animate-blob delay-4 pointer-events-none -z-10"></div>
+
+<!-- ============ Government identity strip ============ -->
+<div class="bg-gradient-to-r from-brand-dark via-brand to-sky-700 text-white text-[11px] px-6 py-2 flex items-center justify-between font-medium tracking-wide">
+  <span class="flex items-center gap-2">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 7v10l11 5 11-5V7L12 2z"/></svg>
+    Commission for Air Quality Management (CAQM) · Govt. of NCT of Delhi
+  </span>
+  <span class="hidden sm:flex items-center gap-4">
+    <span class="opacity-80">CPCB · IMD · NASA FIRMS</span>
+    <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 live-dot"></span>Live</span>
+  </span>
+</div>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="w-60 shrink-0 px-5 py-7 hidden md:flex md:flex-col">
+    <!-- Logo -->
+    <div class="flex items-center gap-3 mb-10">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand to-sky-500 flex items-center justify-center text-white shadow-lg shadow-brand/30">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+      </div>
+      <div>
+        <p class="font-extrabold text-base leading-tight tracking-tight">CleanAir</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Delhi NCR</p>
+      </div>
+    </div>
+    <nav id="sidebarNav" class="flex flex-col gap-1.5 text-sm">
+      <a href="#" id="nav-dash" class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group bg-brand/10 text-brand dark:text-sky-400 font-semibold relative">
+        <div class="nav-indicator absolute inset-y-0 left-0 w-1 bg-brand dark:bg-sky-400 rounded-r-full"></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Dashboard
+      </a>
+      <a href="#" id="nav-map" class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200 relative">
+        <div class="nav-indicator absolute inset-y-0 left-0 w-1 bg-brand dark:bg-sky-400 rounded-r-full hidden"></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        Map View
+      </a>
+      <a href="#" id="nav-reports" class="nav-btn flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200 relative">
+        <div class="nav-indicator absolute inset-y-0 left-0 w-1 bg-brand dark:bg-sky-400 rounded-r-full hidden"></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Analytics & Reports
+      </a>
+    </nav>
+
+    <div class="mt-auto pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
+      <div class="card px-3 py-3">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Stations</span>
+          <span class="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot"></span>All Live
+          </span>
+        </div>
+        <p class="text-lg font-bold">38 <span class="text-xs font-normal text-slate-400">/ 38</span></p>
+        <p class="text-[10px] text-slate-400 mt-0.5">WRF-Chem coupled model</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="flex-1 min-w-0">
+
+    <header class="flex items-center justify-between px-6 py-4 border-b border-slate-200/50 dark:border-slate-800/50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+      <div class="flex items-center gap-3">
+        <select id="locationSelect" class="text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md px-4 py-2 outline-none shadow-sm hover:border-brand dark:hover:border-brand focus:ring-2 focus:ring-brand/20 transition-all cursor-pointer">
+          <option value="2">Delhi NCR</option>
+          <option value="1">North Delhi</option>
+          <option value="0">East Delhi</option>
+          <option value="5">South Delhi</option>
+          <option value="4">Gurugram</option>
+          <option value="3">Noida</option>
+        </select>
+        <select id="dateSelect" class="text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md px-4 py-2 outline-none shadow-sm hover:border-brand dark:hover:border-brand focus:ring-2 focus:ring-brand/20 transition-all cursor-pointer">
+          <option>Today</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-4">
+        <button id="themeToggle" class="p-2.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand dark:hover:text-brand shadow-sm transition-all" title="Toggle theme">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-brand to-sky-400 shadow-md border-2 border-white dark:border-slate-800"></div>
+      </div>
+    </header>
+
+    <main class="p-6 space-y-5">
+
+      <div class="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">Delhi NCR Air Quality Forecast</h1>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">72-hour forecast with weather–pollution interaction (WRF-Chem)</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 rounded-full px-3 py-1.5 font-semibold text-slate-600 dark:text-slate-300 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 live-dot inline-block shadow-[0_0_6px_#22c55e]"></span>
+          Model running · updated <span id="lastUpdated" class="text-brand dark:text-sky-400 ml-1">10:30 AM</span>
+        </div>
+      </div>
+
+      <div class="card relative px-5 py-4 flex items-center gap-4 overflow-hidden group">
+        <div class="absolute inset-0 bg-red-500/10 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
+        <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center shrink-0 relative z-10">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="relative z-10">
+          <p class="text-sm text-red-800 dark:text-red-300">
+            <strong class="font-bold text-red-600 dark:text-red-400">High AQI Warning</strong> — Trapped pollutants and low wind speed expected to drastically worsen air quality over the next 12 hours.
+          </p>
+        </div>
+      </div>
+
+      <!-- Row 1 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        <!-- MAP CARD — real Leaflet map -->
+        <div class="lg:col-span-2 card p-5">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <p class="font-semibold">Delhi NCR Air Quality Map</p>
+            <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <span><span class="inline-block w-2 h-2 rounded-full bg-aqi-good mr-1"></span>Good</span>
+              <span><span class="inline-block w-2 h-2 rounded-full bg-aqi-moderate mr-1"></span>Moderate</span>
+              <span><span class="inline-block w-2 h-2 rounded-full bg-aqi-poor mr-1"></span>Poor</span>
+              <span><span class="inline-block w-2 h-2 rounded-full bg-aqi-verypoor mr-1"></span>Very Poor</span>
+            </div>
+          </div>
+
+          <div id="map"></div>
+
+          <div class="flex items-center gap-2 mt-3 flex-wrap">
+            <button class="pollutant-tab px-3 py-1.5 text-xs font-medium rounded-lg bg-brand text-white" data-p="pm2_5">PM2.5</button>
+            <button class="pollutant-tab px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" data-p="pm10">PM10</button>
+            <button class="pollutant-tab px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" data-p="ozone">O₃</button>
+            <button class="pollutant-tab px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" data-p="nitrogen_dioxide">NO₂</button>
+            <button class="pollutant-tab px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" data-p="european_aqi">AQI</button>
+            <span id="mapDate" class="ml-auto text-xs text-slate-400">Loading...</span>
+          </div>
+        </div>
+
+        <!-- RIGHT: AQI gauge + pollutants, then forecast -->
+        <div class="flex flex-col gap-5">
+
+          <!-- AQI Card -->
+          <div class="card p-5 relative overflow-hidden">
+            <div class="absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br from-brand/10 to-sky-400/10 rounded-full blur-2xl pointer-events-none"></div>
+            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">Current AQI · Delhi</p>
+            <!-- Gauge -->
+            <div class="flex items-center gap-5">
+              <div class="relative w-28 h-28 shrink-0">
+                <div class="absolute inset-0 bg-gradient-radial from-blue-500/10 to-transparent rounded-full blur-xl"></div>
+                <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90 drop-shadow">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" stroke-width="10" class="dark:stroke-slate-800"/>
+                  <circle id="origAqiCircle" cx="50" cy="50" r="42" fill="none" stroke="#ef4444" stroke-width="10"
+                    stroke-dasharray="264" stroke-dashoffset="264" stroke-linecap="round" class="transition-all duration-1000 ease-out"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span id="origAqiVal" class="text-2xl font-black tracking-tighter">--</span>
+                  <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">EAQI</span>
+                </div>
+              </div>
+              <!-- Pollutant bars -->
+              <div class="flex-1 space-y-2.5 text-xs">
+                <div class="pollutant-row">
+                  <div class="flex justify-between font-medium"><span class="text-slate-500 dark:text-slate-400">PM2.5</span><strong id="origPm25" class="text-slate-700 dark:text-slate-200">--</strong></div>
+                  <div class="pollutant-bar-bg"><div id="bar-pm25" class="pollutant-bar-fill bg-red-400"></div></div>
+                </div>
+                <div class="pollutant-row">
+                  <div class="flex justify-between font-medium"><span class="text-slate-500 dark:text-slate-400">PM10</span><strong id="origPm10" class="text-slate-700 dark:text-slate-200">--</strong></div>
+                  <div class="pollutant-bar-bg"><div id="bar-pm10" class="pollutant-bar-fill bg-orange-400"></div></div>
+                </div>
+                <div class="pollutant-row">
+                  <div class="flex justify-between font-medium"><span class="text-slate-500 dark:text-slate-400">O₃</span><strong id="origO3" class="text-slate-700 dark:text-slate-200">--</strong></div>
+                  <div class="pollutant-bar-bg"><div id="bar-o3" class="pollutant-bar-fill bg-blue-400"></div></div>
+                </div>
+                <div class="pollutant-row">
+                  <div class="flex justify-between font-medium"><span class="text-slate-500 dark:text-slate-400">NO₂</span><strong id="origNo2" class="text-slate-700 dark:text-slate-200">--</strong></div>
+                  <div class="pollutant-bar-bg"><div id="bar-no2" class="pollutant-bar-fill bg-purple-400"></div></div>
+                </div>
+              </div>
+            </div>
+            <p id="origAqiLabel" class="mt-4 text-center text-xs font-bold rounded-xl py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 transition-all duration-500">Loading…</p>
+          </div>
+
+          <!-- Forecast Chart Card -->
+          <div class="card p-5 flex-1">
+            <p class="font-bold text-sm mb-0.5">72-Hour AQI Forecast</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3 font-medium">Delhi NCR · WRF-Chem model</p>
+            <div style="height: 190px;">
+              <canvas id="forecastChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        <!-- Weather Card with stat-tiles -->
+        <div class="card p-5">
+          <p class="font-bold text-sm mb-4 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            </span>
+            Weather & Wind
+          </p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="stat-tile">
+              <div class="text-orange-500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
+              <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Temperature</p>
+              <p id="origTemp" class="text-base font-black text-slate-700 dark:text-slate-200">--</p>
+            </div>
+            <div class="stat-tile">
+              <div class="text-sky-500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg></div>
+              <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Wind Speed</p>
+              <p id="origWind" class="text-base font-black text-slate-700 dark:text-slate-200">--</p>
+            </div>
+            <div class="stat-tile">
+              <div class="text-blue-500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></div>
+              <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Humidity</p>
+              <p id="origHum" class="text-base font-black text-slate-700 dark:text-slate-200">--</p>
+            </div>
+            <div class="stat-tile">
+              <div class="text-violet-500"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></div>
+              <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">PBL Height</p>
+              <p class="text-base font-black text-slate-700 dark:text-slate-200">180 m</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Atmospheric Inversion Card — fully animated -->
+        <div class="card p-5 relative overflow-hidden group">
+          <!-- Ambient glow on hover -->
+          <div class="absolute inset-0 bg-gradient-to-br from-purple-500/8 via-rose-500/5 to-blue-500/8 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-4 relative z-10">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2.5"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+              </div>
+              <p class="font-bold text-sm">Atmospheric Inversion</p>
+            </div>
+            <div class="flex items-center gap-1.5 invert-pulse">
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+              </span>
+              <span class="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Active</span>
+            </div>
+          </div>
+
+          <!-- Animated layer diagram -->
+          <div class="relative rounded-2xl overflow-hidden mb-4 z-10 shadow-lg border border-white/30 dark:border-slate-700/40" style="height: 130px;">
+
+            <!-- HOT layer (top) -->
+            <div class="absolute top-0 left-0 right-0 h-[38%] flex items-center px-4 overflow-hidden"
+                 style="background: linear-gradient(135deg, #fca5a5 0%, #f87171 50%, #fca5a5 100%);">
+              <!-- shimmer sweep -->
+              <div class="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent heat-shimmer" style="animation-delay:0s;"></div>
+              <!-- floating heat particles -->
+              <div class="absolute left-[15%] top-1 w-1.5 h-1.5 rounded-full bg-red-300/70 float-particle" style="animation-delay:0s;"></div>
+              <div class="absolute left-[40%] top-2 w-1 h-1 rounded-full bg-orange-200/80 float-particle" style="animation-delay:0.7s;"></div>
+              <div class="absolute left-[65%] top-1 w-1.5 h-1.5 rounded-full bg-red-200/60 float-particle" style="animation-delay:1.3s;"></div>
+              <div class="absolute left-[85%] top-3 w-1 h-1 rounded-full bg-rose-300/70 float-particle" style="animation-delay:0.4s;"></div>
+              <span class="relative z-10 text-xs font-semibold text-red-900 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+                Warmer air (above) — blocks rising pollutants
+              </span>
+            </div>
+
+            <!-- INVERSION BOUNDARY -->
+            <div class="absolute left-0 right-0 flex items-center justify-between px-4 py-1.5 z-20 flow-left"
+                 style="top: 38%; background: rgba(148,163,184,0.85); backdrop-filter: blur(8px); border-top: 1.5px dashed rgba(255,255,255,0.6); border-bottom: 1.5px dashed rgba(255,255,255,0.6);">
+              <div class="flex items-center gap-2">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="transform:rotate(180deg)"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                <span class="text-[11px] font-bold text-white tracking-wide">Inversion Layer</span>
+              </div>
+              <span class="text-[10px] font-black bg-white/20 text-white px-2.5 py-0.5 rounded-full backdrop-blur-sm">≈ 180 m</span>
+            </div>
+
+            <!-- COOL layer (bottom) -->
+            <div class="absolute bottom-0 left-0 right-0 flex items-center px-4 overflow-hidden"
+                 style="top: 55%; background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 50%, #93c5fd 100%);">
+              <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-400/10 via-blue-200/20 to-blue-400/10 animate-pulse" style="animation-duration:3s;"></div>
+              <!-- smog buildup particles trapped near surface -->
+              <div class="absolute bottom-1 left-[20%] w-6 h-2 rounded-full bg-gray-400/40 animate-pulse" style="animation-delay:0s;animation-duration:2s;"></div>
+              <div class="absolute bottom-1.5 left-[50%] w-8 h-1.5 rounded-full bg-gray-300/50 animate-pulse" style="animation-delay:1s;animation-duration:2.5s;"></div>
+              <div class="absolute bottom-1 left-[70%] w-5 h-2 rounded-full bg-gray-400/40 animate-pulse" style="animation-delay:0.5s;animation-duration:3s;"></div>
+              <span class="relative z-10 text-xs font-semibold text-blue-900 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                Cooler air (surface) — smog trapped
+              </span>
+            </div>
+          </div>
+
+          <!-- Status badge + description -->
+          <div class="flex items-start gap-3 relative z-10">
+            <span class="shrink-0 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30 rounded-full px-2.5 py-1 whitespace-nowrap">🔴 Strong</span>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Inversion at ~180 m trapping pollutants near the surface — expect severe smog buildup over next 12 hours.</p>
+          </div>
+        </div>
+
+        <!-- Stubble Burning Card — modernized -->
+        <div class="card p-5 relative overflow-hidden group">
+          <div class="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+          <!-- fire glow bg -->
+          <div class="absolute -bottom-8 -right-8 w-32 h-32 bg-orange-400/20 dark:bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div class="flex items-center gap-2.5 mb-3 relative z-10">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            </div>
+            <div>
+              <p class="font-bold text-sm">Stubble Burning Impact</p>
+              <p class="text-[10px] text-orange-500 font-semibold uppercase tracking-wider">Punjab · Haryana</p>
+            </div>
+          </div>
+
+          <!-- Timeline pill -->
+          <div class="relative z-10 mb-3 flex items-center gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200/50 dark:border-red-500/20 rounded-xl px-3 py-2">
+            <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Plume reaches Delhi NCR in <strong class="text-red-500 font-bold">24–36 hrs</strong></p>
+          </div>
+
+          <!-- Animated plume progress bar -->
+          <div class="relative z-10 mb-3">
+            <div class="flex justify-between text-[10px] font-semibold text-slate-400 mb-1">
+              <span>Punjab Source</span><span>Delhi NCR</span>
+            </div>
+            <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500 shadow-sm" style="width: 65%; animation: flowLeft 3s ease-in-out infinite;"></div>
+            </div>
+          </div>
+
+          <a href="#" class="relative z-10 inline-flex items-center gap-1.5 text-xs font-bold text-brand dark:text-sky-400 hover:gap-2.5 transition-all duration-200">
+            View on Map
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>
+
+      </div>
+
+      <footer class="mt-2 pb-4 flex flex-wrap items-center justify-center gap-3">
+        <span class="text-[11px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 px-3 py-1.5 rounded-full font-medium">⚙ WRF-Chem Meteorology-Chemistry Model</span>
+        <span class="text-[11px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 px-3 py-1.5 rounded-full font-medium">📡 CPCB Real-time Monitoring Network</span>
+        <span class="text-[11px] bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 px-3 py-1.5 rounded-full font-medium">🛰 NASA FIRMS Fire Detection</span>
+      </footer>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  // ---- Theme toggle ----
+  let currentTheme = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  function applyTheme(theme) {
+    currentTheme = theme;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('theme', theme);
+    if (typeof renderMapTiles === 'function') { try { renderMapTiles(); } catch (e) {} }
+    if (forecastChart) {
+      Chart.defaults.color = theme === 'dark' ? '#94a3b8' : '#64748b';
+      forecastChart.options.scales.x.ticks.color = theme === 'dark' ? '#94a3b8' : '#94a3b8';
+      forecastChart.options.scales.y.ticks.color = theme === 'dark' ? '#94a3b8' : '#94a3b8';
+      forecastChart.options.scales.y.grid.color = theme === 'dark' ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.15)';
+      forecastChart.update();
+    }
+    
+    // Update the icon
+    const themeBtn = document.getElementById('themeToggle');
+    if (themeBtn) {
+      if (theme === 'dark') {
+        // Sun icon (to switch back to light)
+        themeBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+      } else {
+        // Moon icon (to switch to dark)
+        themeBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+      }
+    }
+  }
+  try {
+    applyTheme(currentTheme);
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+    });
+  } catch (e) { console.error('Theme toggle failed:', e); }
+
+  function updateRealTime() {
+    const now = new Date();
+    document.getElementById('dateSelect').innerHTML = `<option>${now.toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'})}</option>`;
+    document.getElementById('mapDate').innerText = now.toLocaleString([], {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+    document.getElementById('lastUpdated').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+  }
+  updateRealTime();
+  setInterval(updateRealTime, 1000);
+
+  // API Integration Variables
+  let forecastDataCache = null;
+  let forecastChart = null;
+  let currentPollutant = 'pm2_5';
+  let forecastChartCtx = null;
+  let apiResultsCache = null;
+  let mapMarkersLayerGroup = L.layerGroup(); // Group for easy clearing
+
+  // Pollutant Tab Switching
+  try {
+    document.querySelectorAll('.pollutant-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.pollutant-tab').forEach(b => {
+          b.classList.remove('bg-brand', 'text-white');
+          b.classList.add('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300');
+        });
+        btn.classList.add('bg-brand', 'text-white');
+        btn.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300');
+        
+        currentPollutant = btn.getAttribute('data-p');
+        renderChart();
+        if (apiResultsCache) renderMapMarkers(); // Update map!
+      });
+    });
+  } catch (e) { console.error('Pollutant tabs failed:', e); }
+
+  // ---- Sidebar Navigation ----
+  try {
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const resetNavBtns = () => {
+      navBtns.forEach(btn => {
+        // Remove active styling
+        btn.classList.remove('bg-brand/10', 'text-brand', 'dark:text-sky-400', 'font-semibold');
+        // Add inactive styling
+        btn.classList.add('text-slate-600', 'dark:text-slate-400', 'font-medium', 'hover:bg-slate-100', 'dark:hover:bg-slate-800/60', 'hover:text-slate-900', 'dark:hover:text-slate-200');
+        // Hide indicator
+        btn.querySelector('.nav-indicator').classList.add('hidden');
+      });
+    };
+
+    document.getElementById('nav-dash').addEventListener('click', (e) => {
+      e.preventDefault();
+      resetNavBtns();
+      const btn = e.currentTarget;
+      btn.classList.remove('text-slate-600', 'dark:text-slate-400', 'font-medium', 'hover:bg-slate-100', 'dark:hover:bg-slate-800/60', 'hover:text-slate-900', 'dark:hover:text-slate-200');
+      btn.classList.add('bg-brand/10', 'text-brand', 'dark:text-sky-400', 'font-semibold');
+      btn.querySelector('.nav-indicator').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    document.getElementById('nav-map').addEventListener('click', (e) => {
+      e.preventDefault();
+      resetNavBtns();
+      const btn = e.currentTarget;
+      btn.classList.remove('text-slate-600', 'dark:text-slate-400', 'font-medium', 'hover:bg-slate-100', 'dark:hover:bg-slate-800/60', 'hover:text-slate-900', 'dark:hover:text-slate-200');
+      btn.classList.add('bg-brand/10', 'text-brand', 'dark:text-sky-400', 'font-semibold');
+      btn.querySelector('.nav-indicator').classList.remove('hidden');
+      document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    document.getElementById('nav-reports').addEventListener('click', (e) => {
+      e.preventDefault();
+      resetNavBtns();
+      const btn = e.currentTarget;
+      btn.classList.remove('text-slate-600', 'dark:text-slate-400', 'font-medium', 'hover:bg-slate-100', 'dark:hover:bg-slate-800/60', 'hover:text-slate-900', 'dark:hover:text-slate-200');
+      btn.classList.add('bg-brand/10', 'text-brand', 'dark:text-sky-400', 'font-semibold');
+      btn.querySelector('.nav-indicator').classList.remove('hidden');
+      document.getElementById('forecastChart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  } catch(e) { console.error('Sidebar nav failed:', e); }
+
+  // ---- Real Leaflet map, bounded to Delhi NCR, no API key ----
+  let renderMapTiles;
+  let map;
+  let activeTileLayer;
+
+  try {
+    const NCR_BOUNDS = [[28.05, 76.55], [29.35, 77.75]];
+    map = L.map('map', {
+      center: [28.62, 77.15], zoom: 9, minZoom: 8, maxZoom: 13,
+      maxBounds: NCR_BOUNDS, maxBoundsViscosity: 1.0,
+      attributionControl: false
+    });
+
+    mapMarkersLayerGroup.addTo(map);
+
+    // Free tile layers — zero API key required
+    const tileLayers = {
+      // Standard OSM — clean, detailed, free
+      osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+      // OSM HOT (Humanitarian) — warm tones, modern look, free
+      hot: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'),
+      // Stadia Alidade Smooth — very clean minimal light style, free
+      smooth: L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png'),
+      // Stadia Alidade Smooth Dark — for dark mode, free
+      smoothDark: L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png'),
+    };
+
+    // Layer switcher (user-facing labels)
+    const baseMaps = {
+      '🗺 Standard (OSM)': tileLayers.osm,
+      '🌍 Humanitarian': tileLayers.hot,
+      '✨ Smooth Light': tileLayers.smooth,
+      '🌙 Smooth Dark': tileLayers.smoothDark,
+    };
+    L.control.layers(baseMaps, null, { position: 'topright', collapsed: true }).addTo(map);
+
+    // Default: OSM for light, Smooth Dark for dark mode
+    renderMapTiles = function () {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (activeTileLayer) map.removeLayer(activeTileLayer);
+      activeTileLayer = isDark ? tileLayers.smoothDark : tileLayers.osm;
+      activeTileLayer.addTo(map);
+    };
+    renderMapTiles();
+
+    // Stubble-burning plume: Punjab/Haryana -> Delhi
+    L.polyline([[30.24, 75.84], [29.68, 76.99], [28.65, 77.20]], {
+      color: '#f97316', weight: 3, dashArray: '8 8', opacity: 0.85,
+    }).addTo(map);
+    L.circleMarker([30.24, 75.84], { radius: 6, color: '#fff', fillColor: '#f97316', fillOpacity: 1, weight: 2 })
+      .addTo(map).bindTooltip('🔥 Punjab fire source', { direction: 'top' });
+  } catch (e) {
+    console.error('Map failed to load:', e);
+  }
+
+
+  function getAqiSeverityColor(val, type) {
+    if (type === 'european_aqi') {
+      if (val <= 50) return '#84cc16';
+      if (val <= 100) return '#eab308';
+      if (val <= 200) return '#f97316';
+      return '#ef4444';
+    }
+    if (type === 'ozone') {
+      if (val <= 30) return '#bae6fd'; // very light blue
+      if (val <= 60) return '#7dd3fc'; // soft light blue
+      if (val <= 100) return '#38bdf8'; // light blue
+      return '#0ea5e9'; // vibrant light blue
+    }
+    // Generic scaling for raw pollutants
+    if (val <= 30) return '#84cc16';
+    if (val <= 60) return '#eab308';
+    if (val <= 100) return '#f97316';
+    return '#ef4444';
+  }
+  
+  function getAqiText(aqi) {
+    if (aqi <= 50) return { t: 'Good', c: 'text-green-600 bg-green-50 dark:bg-green-500/10' };
+    if (aqi <= 100) return { t: 'Moderate', c: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-500/10' };
+    if (aqi <= 200) return { t: 'Poor', c: 'text-orange-500 bg-orange-50 dark:bg-orange-500/10' };
+    return { t: 'Very Poor', c: 'text-red-500 bg-red-50 dark:bg-red-500/10' };
+  }
+
+  const stations = [
+    { name: 'Anand Vihar', lat: 28.6469, lng: 77.3152 },
+    { name: 'Jahangirpuri', lat: 28.7286, lng: 77.1637 },
+    { name: 'ITO Central', lat: 28.6289, lng: 77.2410 },
+    { name: 'Noida Sector 62', lat: 28.6274, lng: 77.3716 },
+    { name: 'Gurugram Cyber Hub', lat: 28.4949, lng: 77.0891 },
+    { name: 'R.K. Puram', lat: 28.5632, lng: 77.1869 }
+  ];
+
+  function renderMapMarkers() {
+    if (!apiResultsCache) return;
+    mapMarkersLayerGroup.clearLayers();
+
+    apiResultsCache.forEach((res, i) => {
+      const s = stations[i];
+      const val = res.current[currentPollutant];
+      const color = getAqiSeverityColor(val, currentPollutant);
+      const unit = currentPollutant === 'european_aqi' ? 'AQI' : 'µg/m³';
+      const pLabels = { pm2_5: 'PM2.5', pm10: 'PM10', ozone: 'O₃', nitrogen_dioxide: 'NO₂', european_aqi: 'AQI' };
+      const label = pLabels[currentPollutant] || currentPollutant;
+      
+      // Add pulsing animated icon using Leaflet divIcon
+      const pulseHtml = `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 rgba(0,0,0,0.1); position: relative; border: 2px solid white;">
+                          <div style="content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px; border-radius: 50%; border: 2px solid ${color}; opacity: 0.6; animation: ring 2s infinite ease-out;"></div>
+                         </div>`;
+      const pulseIcon = L.divIcon({ html: pulseHtml, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+      
+      L.circle([s.lat, s.lng], { radius: 9000, color, fillColor: color, fillOpacity: 0.1, weight: 0 }).addTo(mapMarkersLayerGroup);
+      const marker = L.marker([s.lat, s.lng], { icon: pulseIcon }).addTo(mapMarkersLayerGroup);
+      
+      marker.bindTooltip(`<div class="font-sans">
+        <strong class="block text-sm mb-1">${s.name}</strong>
+        <span class="text-xl font-bold" style="color: ${color}">${val}</span> <span class="text-xs font-semibold text-slate-500">${unit}</span>
+        <span class="block text-[10px] uppercase font-semibold text-slate-400 mt-0.5 tracking-wider">${label}</span>
+      </div>`, { direction: 'top', offset: [0, -10], className: 'backdrop-blur-md bg-white/90 dark:bg-slate-800/90 border-0 shadow-lg rounded-xl p-2' });
+    });
+  }
+
+  // ---- Fetch Real API Data ----
+  async function fetchRealData() {
+    try {
+      const NCR_CENTER = [28.6139, 77.2090];
+      
+      // Fetch weather
+      const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${NCR_CENTER[0]}&longitude=${NCR_CENTER[1]}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&timezone=Asia%2FKolkata`);
+      const weatherData = await weatherRes.json();
+      
+      document.getElementById('origTemp').innerText = `${weatherData.current.temperature_2m}°C`;
+      document.getElementById('origHum').innerText = `${weatherData.current.relative_humidity_2m}%`;
+      document.getElementById('origWind').innerText = `${weatherData.current.wind_speed_10m} km/h`;
+
+      // Fetch Air Quality for multiple stations
+      const lats = stations.map(s => s.lat).join(',');
+      const lngs = stations.map(s => s.lng).join(',');
+      
+      const aqiRes = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lngs}&current=european_aqi,pm10,pm2_5,ozone,nitrogen_dioxide&hourly=european_aqi,pm10,pm2_5,ozone,nitrogen_dioxide&timezone=Asia%2FKolkata`);
+      const aqiDataArray = await aqiRes.json();
+      apiResultsCache = Array.isArray(aqiDataArray) ? aqiDataArray : [aqiDataArray];
+      
+      // Plot markers initially
+      renderMapMarkers();
+
+      // Extracted function to update the main dashboard when a station is selected
+      window.updateDashboardForStation = function(index) {
+        if (!apiResultsCache || !apiResultsCache[index]) return;
+        const mainData = apiResultsCache[index].current;
+        const mainAqi = mainData.european_aqi;
+        
+        document.getElementById('origAqiVal').innerText = mainAqi;
+        document.getElementById('origPm25').innerText = mainData.pm2_5;
+        document.getElementById('origPm10').innerText = mainData.pm10;
+        document.getElementById('origO3').innerText = mainData.ozone;
+        document.getElementById('origNo2').innerText = mainData.nitrogen_dioxide;
+
+        // Reset bars for animation
+        ['pm25', 'pm10', 'o3', 'no2'].forEach(id => document.getElementById(`bar-${id}`).style.width = '0%');
+
+        setTimeout(() => {
+          document.getElementById('bar-pm25').style.width = Math.min((mainData.pm2_5 / 200) * 100, 100) + '%';
+          document.getElementById('bar-pm10').style.width = Math.min((mainData.pm10 / 350) * 100, 100) + '%';
+          document.getElementById('bar-o3').style.width = Math.min((mainData.ozone / 200) * 100, 100) + '%';
+          document.getElementById('bar-no2').style.width = Math.min((mainData.nitrogen_dioxide / 200) * 100, 100) + '%';
+        }, 50);
+        
+        const aqiTxtObj = getAqiText(mainAqi);
+        const lbl = document.getElementById('origAqiLabel');
+        lbl.innerText = aqiTxtObj.t;
+        lbl.className = `text-center mt-2 text-xs font-semibold rounded-full py-1 ${aqiTxtObj.c}`;
+        
+        const circle = document.getElementById('origAqiCircle');
+        circle.style.stroke = getAqiSeverityColor(mainAqi, 'european_aqi');
+        const percentage = Math.min(mainAqi / 150, 1);
+        circle.style.strokeDashoffset = 264 - (264 * percentage);
+        
+        forecastDataCache = apiResultsCache[index].hourly;
+        renderChart();
+      };
+
+      // Handle dropdown changes
+      document.getElementById('locationSelect').addEventListener('change', (e) => {
+        const index = parseInt(e.target.value);
+        updateDashboardForStation(index);
+        
+        // Fly map to the selected station
+        const station = stations[index];
+        if (map && station) {
+          map.flyTo([station.lat, station.lng], 12, { duration: 1.5 });
+        }
+      });
+
+      // Initial load for Delhi NCR (index 2)
+      updateDashboardForStation(2);
+      
+    } catch (e) {
+      console.error("API fetch error:", e);
+    }
+  }
+
+  // ---- 72-hour forecast chart ----
+  function renderChart() {
+    if (!forecastDataCache) return;
+    
+    const now = new Date();
+    let startIndex = 0;
+    for(let i=0; i<forecastDataCache.time.length; i++){
+      if(new Date(forecastDataCache.time[i]) >= now) {
+        startIndex = i;
+        break;
+      }
+    }
+    
+    const times = forecastDataCache.time.slice(startIndex, startIndex + 72);
+    const data = forecastDataCache[currentPollutant].slice(startIndex, startIndex + 72);
+    
+    const displayLabels = times.map((t, i) => {
+      const d = new Date(t);
+      if (i === 0) return 'Now';
+      if (i % 12 === 0) return d.getHours() + 'h\n(' + d.getDate() + ' ' + d.toLocaleString('en', {month: 'short'}) + ')';
+      return '';
+    });
+    
+    // dynamic color for chart based on pollutant
+    let chartColor = '#ef4444'; 
+    let chartBgColor = 'rgba(239,68,68,0.08)';
+    if (currentPollutant === 'ozone') {
+      chartColor = '#0ea5e9';
+      chartBgColor = 'rgba(14,165,233,0.15)';
+    } else if (currentPollutant === 'european_aqi') {
+      chartColor = '#8b5cf6';
+      chartBgColor = 'rgba(139,92,246,0.08)';
+    } else if (currentPollutant === 'pm2_5' || currentPollutant === 'pm10') {
+      chartColor = '#f97316';
+      chartBgColor = 'rgba(249,115,22,0.08)';
+    }
+
+    const pLabels = { pm2_5: 'PM2.5', pm10: 'PM10', ozone: 'O₃', nitrogen_dioxide: 'NO₂', european_aqi: 'AQI' };
+    const niceLabel = pLabels[currentPollutant] || currentPollutant;
+
+    if (forecastChart) {
+      forecastChart.data.labels = displayLabels;
+      forecastChart.data.datasets[0].data = data;
+      forecastChart.data.datasets[0].label = niceLabel;
+      forecastChart.data.datasets[0].borderColor = chartColor;
+      forecastChart.data.datasets[0].backgroundColor = chartBgColor;
+      forecastChart.data.datasets[0].pointBackgroundColor = (c) => c.raw > (currentPollutant === 'ozone' ? 60 : 100) ? chartColor : '#eab308';
+      forecastChart.update();
+      return;
+    }
+
+    forecastChartCtx = document.getElementById('forecastChart').getContext('2d');
+    forecastChart = new Chart(forecastChartCtx, {
+      type: 'line',
+      data: {
+        labels: displayLabels,
+        datasets: [{
+          label: niceLabel,
+          data: data,
+          borderColor: chartColor,
+          backgroundColor: chartBgColor,
+          fill: true, tension: 0.35, pointRadius: 4,
+          pointBackgroundColor: (c) => c.raw > (currentPollutant === 'ozone' ? 60 : 100) ? chartColor : '#eab308',
+          borderWidth: 2.5,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { font: { size: 10 }, color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#94a3b8' }, grid: { display: false } },
+          y: { min: 0, ticks: { font: { size: 10 }, color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#94a3b8', stepSize: 50 }, grid: { color: document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.15)' } }
+        }
+      }
+    });
+  }
+  
+  // Kick off API
+  fetchRealData();
+  
+</script>
+
+</body>
+</html>
