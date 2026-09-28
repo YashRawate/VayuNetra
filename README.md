@@ -1,4 +1,4 @@
-﻿# 🌫️ VayuNetra — Real-Time Air Quality Intelligence Platform
+ ﻿# 🌫️ VayuNetra — Real-Time Air Quality Intelligence Platform
 
 <div align="center">
 
