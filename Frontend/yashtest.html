@@ -3167,6 +3167,9 @@
     const $ = (id) => document.getElementById(id);
     const isDark = () => document.documentElement.classList.contains("dark");
 
+    // REPLACE THIS URL WITH YOUR ACTUAL AWS API DOMAIN OR IP
+    const BACKEND_URL = "http://YOUR_AWS_BACKEND_IP_OR_DOMAIN:8000";
+
     const stations = [
       { name: "Anand Vihar", area: "East Delhi", lat: 28.6469, lng: 77.3152 },
       {
@@ -3554,12 +3557,22 @@
         const smokeCompassDir = (windDegree + 180) % 360;
         const cssRotate = smokeCompassDir - 90;
 
-        // 2. Fires Data (No endpoints)
-        const fires = [];
+        // 2. Fires Data from actual AWS backend
+        let fires = [];
+        try {
+          // Note: BACKEND_URL must be accessible globally, it is defined at the top of the file
+          if (typeof BACKEND_URL !== "undefined") {
+            const fireRes = await fetch(`${BACKEND_URL}/api/fires`);
+            const fireData = await fireRes.json();
+            if (fireData && Array.isArray(fireData.fires)) {
+              fires = fireData.fires;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch live fires from backend:", e);
+        }
 
         if (fires.length === 0) {
-          // No fallback fires added.
-        }
 
         const delhiLL = [28.6139, 77.2090];
         function getDistance(lat1, lon1, lat2, lon2) {
@@ -4646,13 +4659,19 @@
     /* =====================================================
  7. DATA — REAL-TIME BACKEND INTEGRATION (Vital 2.0 API)
 ===================================================== */
-    const BACKEND_URL = "http://32.196.37.69:3000";
+    // REPLACE THIS URL WITH YOUR ACTUAL AWS API DOMAIN OR IP
+    const BACKEND_URL = "http://YOUR_AWS_BACKEND_IP_OR_DOMAIN:8000";
 
     async function fetchRealData() {
       try {
-        // 1. Forecast Data (No endpoints)
+        // 1. Forecast Data from your actual AWS backend
         let fcRes = null;
-
+        try {
+          const fcResponse = await fetch(`${BACKEND_URL}/api/forecast/72h`);
+          fcRes = await fcResponse.json();
+        } catch (e) {
+          console.error("Failed to load forecast data from backend", e);
+        }
         // Build forecast hourly timeline from backend
         const now = new Date();
         now.setMinutes(0, 0, 0);
@@ -4682,8 +4701,14 @@
 
         // Removed fallback synthetic diurnal curve. Only genuine API data is kept.
 
-        // 2. Live Station Data (No endpoints)
-        const liveResults = stations.map(s => null);
+        // 2. Live Station Data from your actual AWS backend
+        let liveResults = stations.map(s => null);
+        try {
+          const livePromises = stations.map(s => fetch(`${BACKEND_URL}/api/live?lat=${s.lat}&lon=${s.lng}`).then(r => r.json()).catch(() => null));
+          liveResults = await Promise.all(livePromises);
+        } catch (e) {
+          console.error("Failed to load live data from backend", e);
+        }
 
         const aqiData = [];
         const wxData = [];
