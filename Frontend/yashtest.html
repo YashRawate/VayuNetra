@@ -3557,35 +3557,19 @@
         const smokeCompassDir = (windDegree + 180) % 360;
         const cssRotate = smokeCompassDir - 90;
 
-        // 2. Fires Data from NASA FIRMS API directly
+        // 2. Fires Data from actual AWS backend
         let fires = [];
         try {
-          const FIRMS_KEY = "560c291c2809b4c60d47652e44e0c2c8";
-          // Fetch VIIRS SNPP Near Real-Time data for India region
-          const fireRes = await fetch(`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_KEY}/VIIRS_SNPP_NRT/68,20,88,35/1`);
-          const csvText = await fireRes.text();
-          const lines = csvText.trim().split("\n");
-          if (lines.length > 1) {
-            const headers = lines[0].split(",");
-            const latIdx = headers.indexOf("latitude");
-            const lonIdx = headers.indexOf("longitude");
-            const frpIdx = headers.indexOf("frp");
-            
-            if (latIdx !== -1 && lonIdx !== -1) {
-              for (let i = 1; i < lines.length; i++) {
-                const cols = lines[i].split(",");
-                if (cols.length > Math.max(latIdx, lonIdx, frpIdx)) {
-                  fires.push({
-                    lat: parseFloat(cols[latIdx]),
-                    lng: parseFloat(cols[lonIdx]),
-                    frp: frpIdx !== -1 ? parseFloat(cols[frpIdx]) : 20
-                  });
-                }
-              }
+          // Note: BACKEND_URL must be accessible globally, it is defined at the top of the file
+          if (typeof BACKEND_URL !== "undefined") {
+            const fireRes = await fetch(`${BACKEND_URL}/api/fires`);
+            const fireData = await fireRes.json();
+            if (fireData && Array.isArray(fireData.fires)) {
+              fires = fireData.fires;
             }
           }
         } catch (e) {
-          console.error("Failed to fetch live fires from NASA FIRMS:", e);
+          console.error("Failed to fetch live fires from backend:", e);
         }
 
         if (fires.length === 0) {
@@ -4676,67 +4660,54 @@
     /* =====================================================
  7. DATA — REAL-TIME BACKEND INTEGRATION (Vital 2.0 API)
 ===================================================== */
-    // Public API Keys
-    const WAQI_KEY = "eafe02d1aea8acebac99eadbaf398b6a47ff354c";
-    const WEATHER_API_KEY = "a258f518f1714d3a90e164530261809";
+    // Backend URL is defined globally at the top of the file
 
     async function fetchRealData() {
       try {
+        // 1. Forecast Data from your actual AWS backend
+        let fcRes = null;
+        try {
+          const fcResponse = await fetch(`${BACKEND_URL}/api/forecast/72h`);
+          fcRes = await fcResponse.json();
+        } catch (e) {
+          console.error("Failed to load forecast data from backend", e);
+        }
+        // Build forecast hourly timeline from backend
         const now = new Date();
         now.setMinutes(0, 0, 0);
+        const fcTimes = [];
+        const fcPm25 = [];
+        const fcPm10 = [];
+        const fcNo2 = [];
+        const fcO3 = [];
+        const fcAqi = [];
+        const fcCo = [];
 
-        // 1. Forecast Data from Open-Meteo (Air Quality)
-        let fcTimes = [], fcPm25 = [], fcPm10 = [], fcNo2 = [], fcO3 = [], fcAqi = [], fcCo = [];
-        try {
-          const fcResponse = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=28.6139&longitude=77.2090&hourly=pm10,pm2_5,nitrogen_dioxide,ozone,european_aqi&timezone=auto`);
-          const fcRes = await fcResponse.json();
-          if (fcRes && fcRes.hourly) {
-            fcTimes = fcRes.hourly.time || [];
-            fcPm25 = fcRes.hourly.pm2_5 || [];
-            fcPm10 = fcRes.hourly.pm10 || [];
-            fcNo2 = fcRes.hourly.nitrogen_dioxide || [];
-            fcO3 = fcRes.hourly.ozone || [];
-            fcAqi = fcRes.hourly.european_aqi || [];
-            fcCo = fcTimes.map(() => 0);
+        if (fcRes && Array.isArray(fcRes.forecast) && fcRes.forecast.length > 0) {
+          fcRes.forecast.forEach((item, idx) => {
+            const d = new Date(now.getTime() + idx * 3600000);
+            fcTimes.push(d.toISOString().slice(0, 16));
+            fcPm25.push(item.pm25);
+            fcPm10.push(item.pm10);
+            fcNo2.push(item.no2);
+            fcO3.push(item.o3);
+            fcAqi.push(item.aqi);
+            fcCo.push(item.co);
+          });
+          if (fcRes.forecast.length < 24) {
+            console.warn(`[Vital 2.0] Forecast API returned only ${fcRes.forecast.length} hourly points (need ≥72). Extending with synthetic diurnal curve.`);
           }
-        } catch (e) {
-          console.error("Failed to load forecast data from Open-Meteo", e);
         }
 
-        // 2. Live Station Data from WAQI and WeatherAPI
+        // Removed fallback synthetic diurnal curve. Only genuine API data is kept.
+
+        // 2. Live Station Data from your actual AWS backend
         let liveResults = stations.map(s => null);
         try {
-          const livePromises = stations.map(async (s) => {
-            let res = { timestamp: now.toISOString().slice(0, 16) };
-            try {
-              // WAQI for AQI
-              const waqiRes = await fetch(`https://api.waqi.info/feed/geo:${s.lat};${s.lng}/?token=${WAQI_KEY}`);
-              const waqiData = await waqiRes.json();
-              if (waqiData.status === "ok") {
-                const iaqi = waqiData.data.iaqi || {};
-                res.aqi = waqiData.data.aqi;
-                res.pm25 = iaqi.pm25 ? iaqi.pm25.v : null;
-                res.pm10 = iaqi.pm10 ? iaqi.pm10.v : null;
-                res.o3 = iaqi.o3 ? iaqi.o3.v : null;
-                res.no2 = iaqi.no2 ? iaqi.no2.v : null;
-              }
-              // WeatherAPI for Weather
-              const wxRes = await fetch(`https://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=${s.lat},${s.lng}`);
-              const wxData = await wxRes.json();
-              if (wxData.current) {
-                res.temperature_C = wxData.current.temp_c;
-                res.humidity = wxData.current.humidity;
-                res.wind_speed = wxData.current.wind_kph;
-                res.wind_direction = wxData.current.wind_degree;
-              }
-            } catch (err) {
-              console.error("Error fetching live API for station:", s.name, err);
-            }
-            return res;
-          });
+          const livePromises = stations.map(s => fetch(`${BACKEND_URL}/api/live?lat=${s.lat}&lon=${s.lng}`).then(r => r.json()).catch(() => null));
           liveResults = await Promise.all(livePromises);
         } catch (e) {
-          console.error("Failed to load live data", e);
+          console.error("Failed to load live data from backend", e);
         }
 
         const aqiData = [];
