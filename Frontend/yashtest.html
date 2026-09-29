@@ -5615,12 +5615,12 @@
           const CHECK_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
 
           let STATES = [
-            { h: "NOW", aqi: 86, pblCeiling: 190, invBase: 240, invTop: 720, pm25: 105, windSpeed: 1.5, windDir: 120, surfaceTemp: 28.9, humidity: 67, status: "STRONG" },
-            { h: "6H", aqi: 120, pblCeiling: 220, invBase: 230, invTop: 680, pm25: 125, windSpeed: 1.8, windDir: 140, surfaceTemp: 27.5, humidity: 70, status: "STRONG" },
-            { h: "12H", aqi: 185, pblCeiling: 160, invBase: 200, invTop: 600, pm25: 145, windSpeed: 1.1, windDir: 280, surfaceTemp: 26.0, humidity: 74, status: "MODERATE" },
-            { h: "24H", aqi: 199, pblCeiling: 260, invBase: 180, invTop: 500, pm25: 148, windSpeed: 2.2, windDir: 260, surfaceTemp: 25.0, humidity: 65, status: "WEAK" },
-            { h: "48H", aqi: 215, pblCeiling: 180, invBase: 220, invTop: 690, pm25: 165, windSpeed: 1.3, windDir: 310, surfaceTemp: 27.0, humidity: 68, status: "STRONG" },
-            { h: "72H", aqi: 235, pblCeiling: 140, invBase: 250, invTop: 750, pm25: 180, windSpeed: 0.9, windDir: 320, surfaceTemp: 28.0, humidity: 64, status: "STRONG" },
+            { h: "NOW", aqi: null, pblCeiling: null, invBase: null, invTop: null, pm25: null, windSpeed: null, windDir: null, surfaceTemp: null, humidity: null, status: "--" },
+            { h: "6H", aqi: null, pblCeiling: null, invBase: null, invTop: null, pm25: null, windSpeed: null, windDir: null, surfaceTemp: null, humidity: null, status: "--" },
+            { h: "12H", aqi: null, pblCeiling: null, invBase: null, invTop: null, pm25: null, windSpeed: null, windDir: null, surfaceTemp: null, humidity: null, status: "--" },
+            { h: "24H", aqi: null, pblCeiling: null, invBase: null, invTop: null, pm25: null, windSpeed: null, windDir: null, surfaceTemp: null, humidity: null, status: "--" },
+            { h: "48H", aqi: null, pblCeiling: null, invBase: null, invTop: null, pm25: null, windSpeed: null, windDir: null, surfaceTemp: null, humidity: null, status: "--" },
+            { h: "72H", aqi: null, pblCeiling: null, invBase: null, invTop: null, pm25: null, windSpeed: null, windDir: null, surfaceTemp: null, humidity: null, status: "--" },
           ];
 
           function syncAerolensWithBackend(fcData, liveData) {
@@ -5665,22 +5665,22 @@
           const GRADIENT_BY_STATUS = { STRONG: 6.4, MODERATE: 3.2, WEAK: 1.0 };
 
           function deriveState(raw) {
-            const grad = GRADIENT_BY_STATUS[raw.status];
-            const depthKm = (raw.invTop - raw.invBase) / 1000;
-            const baseTemp = raw.surfaceTemp - 1.2;
-            const topTemp = baseTemp + grad * depthKm;
+            const grad = raw.status && GRADIENT_BY_STATUS[raw.status] ? GRADIENT_BY_STATUS[raw.status] : null;
+            const depthKm = raw.invTop != null ? (raw.invTop - raw.invBase) / 1000 : null;
+            const baseTemp = raw.surfaceTemp != null ? raw.surfaceTemp - 1.2 : null;
+            const topTemp = baseTemp != null && depthKm != null ? baseTemp + grad * depthKm : null;
             // sounding profile: surface &rarr; invBase &rarr; invTop &rarr; then decaying lapse to 3000m
             const profile = [
-              { alt: 0, temp: raw.surfaceTemp },
-              { alt: 240 * (raw.invBase / 240) || raw.invBase, temp: baseTemp },
-              { alt: raw.invTop, temp: topTemp },
-              { alt: 1200, temp: topTemp - 2.6 },
-              { alt: 2000, temp: topTemp - 8.0 },
-              { alt: 3000, temp: topTemp - 14.5 },
+              { alt: 0, temp: raw.surfaceTemp || 0 },
+              { alt: raw.invBase || 240, temp: baseTemp || 0 },
+              { alt: raw.invTop || 720, temp: topTemp || 0 },
+              { alt: 1200, temp: (topTemp || 0) - 2.6 },
+              { alt: 2000, temp: (topTemp || 0) - 8.0 },
+              { alt: 3000, temp: (topTemp || 0) - 14.5 },
             ];
             // keep canonical altitude ticks for axis regardless of invBase/invTop drift
-            profile[1].alt = raw.invBase; profile[2].alt = raw.invTop;
-            return Object.assign({}, raw, { gradient: grad, invDepth: raw.invTop - raw.invBase, baseTemp, topTemp, profile });
+            profile[1].alt = raw.invBase || 0; profile[2].alt = raw.invTop || 0;
+            return Object.assign({}, raw, { gradient: grad, invDepth: raw.invTop != null ? raw.invTop - raw.invBase : null, baseTemp, topTemp, profile });
           }
           const DSTATES = STATES.map(deriveState);
 
@@ -5702,22 +5702,22 @@
     <div class="legend-row chip amber">
       <span class="legend-icon square amber"></span>
       <span class="legend-label amber">Inversion Layer</span>
-      <span class="legend-val amber mono" id="rvInversion">${Math.round(st.invBase)}–${Math.round(st.invTop)}m</span>
+      <span class="legend-val amber mono" id="rvInversion">${st.invBase != null ? Math.round(st.invBase) + '–' + Math.round(st.invTop) + 'm' : '--'}</span>
     </div>
     <div class="legend-row chip cyan">
       <span class="legend-icon square cyan"></span>
       <span class="legend-label cyan">PBL Boundary</span>
-      <span class="legend-val cyan mono" id="rvPbl">${Math.round(st.pblCeiling)}m</span>
+      <span class="legend-val cyan mono" id="rvPbl">${st.pblCeiling != null ? Math.round(st.pblCeiling) + 'm' : '--'}</span>
     </div>
     <div class="legend-row legend-plain">
       <span class="legend-icon dot pink"></span>
       <span class="legend-label pink">Trapped PM2.5 Plume</span>
-      <span class="legend-val pink mono" id="rvPm25">${Math.round(st.pm25)}</span><span class="legend-unit">µg/m³</span>
+      <span class="legend-val pink mono" id="rvPm25">${st.pm25 != null ? Math.round(st.pm25) : '--'}</span><span class="legend-unit">µg/m³</span>
     </div>
     <div class="legend-row legend-plain">
       <span class="legend-icon dot blue"></span>
       <span class="legend-label blue">3D Wind Vector Grid</span>
-      <span class="legend-val mono" style="color:var(--text-dim)" id="rvWind">${st.windSpeed.toFixed(1)} m/s</span>
+      <span class="legend-val mono" style="color:var(--text-dim)" id="rvWind">${st.windSpeed != null ? st.windSpeed.toFixed(1) + ' m/s' : '--'}</span>
     </div>
   `;
           }
@@ -5797,20 +5797,20 @@
       </div>
       ${buildSoundingSvg(st)}
       <div class="stat-row-3">
-        <div class="stat-mini"><div class="lab">BASE ALT</div><div class="val mono" style="color:var(--amber-soft)">${Math.round(st.invBase)} m</div></div>
-        <div class="stat-mini"><div class="lab">TOP ALT</div><div class="val mono" style="color:var(--amber-soft)">${Math.round(st.invTop)} m</div></div>
-        <div class="stat-mini"><div class="lab">GRADIENT</div><div class="val mono" style="color:var(--coral)">+${st.gradient.toFixed(1)} °C/km</div></div>
+        <div class="stat-mini"><div class="lab">BASE ALT</div><div class="val mono" style="color:var(--amber-soft)">${st.invBase != null ? Math.round(st.invBase) + ' m' : '--'}</div></div>
+        <div class="stat-mini"><div class="lab">TOP ALT</div><div class="val mono" style="color:var(--amber-soft)">${st.invTop != null ? Math.round(st.invTop) + ' m' : '--'}</div></div>
+        <div class="stat-mini"><div class="lab">GRADIENT</div><div class="val mono" style="color:var(--coral)">${st.gradient != null ? '+' + st.gradient.toFixed(1) + ' °C/km' : '--'}</div></div>
       </div>
     </div>
 
     <div class="section-label">BOUNDARY LAYER PHYSICS</div>
     <div class="stat-grid-2">
-      <div class="stat-box"><div class="lab">Inversion Status</div><div class="val" style="color:var(--amber-soft)">${st.status}</div></div>
-      <div class="stat-box"><div class="lab">Inversion Depth</div><div class="val mono">${Math.round(st.invDepth)} m</div></div>
-      <div class="stat-box"><div class="lab">PBL Ceiling</div><div class="val mono" style="color:var(--cyan)">${Math.round(st.pblCeiling)} m</div></div>
-      <div class="stat-box"><div class="lab">Surface Temp</div><div class="val mono">${st.surfaceTemp.toFixed(1)} °C</div></div>
-      <div class="stat-box"><div class="lab">Wind Vector</div><div class="val mono">${st.windSpeed.toFixed(1)} m/s (${st.windDir}°)</div></div>
-      <div class="stat-box"><div class="lab">Relative Humidity</div><div class="val mono">${st.humidity} %</div></div>
+      <div class="stat-box"><div class="lab">Inversion Status</div><div class="val" style="color:var(--amber-soft)">${st.status !== "--" ? st.status : "No Data"}</div></div>
+      <div class="stat-box"><div class="lab">Inversion Depth</div><div class="val mono">${st.invDepth != null ? Math.round(st.invDepth) + ' m' : '--'}</div></div>
+      <div class="stat-box"><div class="lab">PBL Ceiling</div><div class="val mono" style="color:var(--cyan)">${st.pblCeiling != null ? Math.round(st.pblCeiling) + ' m' : '--'}</div></div>
+      <div class="stat-box"><div class="lab">Surface Temp</div><div class="val mono">${st.surfaceTemp != null ? st.surfaceTemp.toFixed(1) + ' °C' : '--'}</div></div>
+      <div class="stat-box"><div class="lab">Wind Vector</div><div class="val mono">${st.windSpeed != null ? st.windSpeed.toFixed(1) + ' m/s (' + st.windDir + '°)' : '--'}</div></div>
+      <div class="stat-box"><div class="lab">Relative Humidity</div><div class="val mono">${st.humidity != null ? st.humidity + ' %' : '--'}</div></div>
     </div>
   `;
           }</script>
@@ -5831,10 +5831,10 @@
           function commitState(idx) {
             activeIdx = idx;
             current = DSTATES[idx];
-            document.getElementById("tlAqi").textContent = current.aqi;
+            document.getElementById("tlAqi").textContent = current.aqi != null ? current.aqi : "--";
             const pill = document.getElementById("tlStatusPill");
-            pill.textContent = current.status + " INVERSION";
-            pill.className = "tl-status " + STATUS_CLASS[current.status];
+            pill.textContent = current.status !== "--" ? current.status + " INVERSION" : "NO DATA";
+            pill.className = "tl-status " + (STATUS_CLASS[current.status] || "weak");
             updateTimelineHandle(idx);
             renderLayersCard(current);
             renderDrawer(current);
