@@ -3545,50 +3545,17 @@
 
     async function addPlume(ctx) {
       try {
-        // 1. Fetch Weather Data for Wind
-        const weatherApiKey = "a258f518f1714d3a90e164530261809";
-        const wxUrl = `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=Karnal`;
+        // 1. Weather Data (No endpoints)
         let windDegree = null;
         let windKph = null;
         let windDir = "--";
-
-        try {
-          const wxRes = await fetch(wxUrl);
-          if (wxRes.ok) {
-            const wxData = await wxRes.json();
-            windDegree = wxData.current.wind_degree;
-            windKph = wxData.current.wind_kph;
-            windDir = wxData.current.wind_dir;
-          }
-        } catch (e) { console.warn("Weather API failed", e); }
 
         // Smoke blows exactly downwind from source
         const smokeCompassDir = (windDegree + 180) % 360;
         const cssRotate = smokeCompassDir - 90;
 
-        // 2. Fetch Active Stubble / Biomass Fires directly from Vital 2.0 Backend (/api/fires)
+        // 2. Fires Data (No endpoints)
         const fires = [];
-        try {
-          const fireRes = await fetch(`${BACKEND_URL}/api/fires`);
-          if (fireRes.ok) {
-            const fireJson = await fireRes.json();
-            if (Array.isArray(fireJson.fires)) {
-              fireJson.fires.forEach(f => {
-                fires.push({
-                  lat: parseFloat(f.latitude),
-                  lng: parseFloat(f.longitude),
-                  frp: f.frp != null ? f.frp : "--",
-                  sat: f.satellite || "VIIRS",
-                  inst: "VIIRS",
-                  date: f.acq_date || "Today",
-                  time: f.acq_time ? String(f.acq_time).padStart(4, '0') : "--"
-                });
-              });
-            }
-          }
-        } catch (fireErr) {
-          console.warn("Backend /api/fires failed, attempting fallback:", fireErr);
-        }
 
         if (fires.length === 0) {
           // No fallback fires added.
@@ -4683,14 +4650,8 @@
 
     async function fetchRealData() {
       try {
-        // 1. Fetch 72h WRF-Chem Forecast from backend
+        // 1. Forecast Data (No endpoints)
         let fcRes = null;
-        try {
-          const resp = await fetch(`${BACKEND_URL}/api/forecast/72h`);
-          if (resp.ok) fcRes = await resp.json();
-        } catch (err) {
-          console.warn("Backend 72h forecast error:", err);
-        }
 
         // Build forecast hourly timeline from backend
         const now = new Date();
@@ -4721,14 +4682,8 @@
 
         // Removed fallback synthetic diurnal curve. Only genuine API data is kept.
 
-        // 2. Fetch live data for each station from /api/live?lat=...&lng=...
-        const livePromises = stations.map(s =>
-          fetch(`${BACKEND_URL}/api/live?lat=${s.lat}&lng=${s.lng}`)
-            .then(r => r.ok ? r.json() : null)
-            .catch(e => { console.warn(`Live fetch failed for ${s.name}:`, e); return null; })
-        );
-
-        const liveResults = await Promise.all(livePromises);
+        // 2. Live Station Data (No endpoints)
+        const liveResults = stations.map(s => null);
 
         const aqiData = [];
         const wxData = [];
