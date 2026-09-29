@@ -2103,7 +2103,7 @@
                 </div>
               </div>
               <span id="sbBadge"
-                class="text-[10px] bg-red-500/10 text-red-500 font-bold px-2 py-0.5 rounded-full border border-red-500/20">High</span>
+                class="text-[10px] bg-slate-500/10 text-slate-500 font-bold px-2 py-0.5 rounded-full border border-slate-500/20">No Data</span>
             </div>
 
             <!-- Transport Flow -->
@@ -2130,17 +2130,17 @@
               <div
                 class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5 border border-slate-100 dark:border-slate-700/50">
                 <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Fires</p>
-                <p id="sbFires" class="font-black text-orange-500 text-sm">1,284</p>
+                <p id="sbFires" class="font-black text-slate-500 text-sm">--</p>
               </div>
               <div
                 class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5 border border-slate-100 dark:border-slate-700/50">
                 <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Arrival</p>
-                <p id="sbArrival" class="font-black text-red-500 text-sm">54–66 hrs</p>
+                <p id="sbArrival" class="font-black text-slate-500 text-sm">-- hrs</p>
               </div>
               <div
                 class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5 border border-slate-100 dark:border-slate-700/50">
                 <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">PM2.5 ↑</p>
-                <p id="sbPmImpact" class="font-black text-red-500 text-sm">+86 <span class="text-[10px]">µg/m³</span>
+                <p id="sbPmImpact" class="font-black text-slate-500 text-sm">-- <span class="text-[10px]">µg/m³</span>
                 </p>
               </div>
             </div>
@@ -2148,10 +2148,10 @@
             <!-- Wind summary -->
             <div id="sbWindSummary"
               class="relative z-10 mb-4 flex items-center gap-2 bg-slate-50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 rounded-xl px-3 py-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
-              🧭 Wind <strong class="text-slate-700 dark:text-white">W 2 km/h</strong> → plume drifts <strong
-                class="text-slate-700 dark:text-white">E</strong> · ETA ≈ <strong
-                class="text-slate-700 dark:text-white">60 hrs</strong> · peak ≈ <strong
-                class="text-slate-700 dark:text-white">204 µg/m³</strong>
+              🧭 Wind <strong class="text-slate-700 dark:text-white">-- km/h</strong> → plume drifts <strong
+                class="text-slate-700 dark:text-white">--</strong> · ETA ≈ <strong
+                class="text-slate-700 dark:text-white">-- hrs</strong> · peak ≈ <strong
+                class="text-slate-700 dark:text-white">-- µg/m³</strong>
             </div>
 
             <!-- Progress bar -->
@@ -4113,37 +4113,37 @@
       // Update Stubble Burning panel based on 72h / 24h toggle
       if ($("sbFires")) {
         if (dashFcLength === 24) {
-          $("sbBadge").className = "text-[10px] bg-orange-500/10 text-orange-500 font-bold px-2 py-0.5 rounded-full border border-orange-500/20";
-          $("sbBadge").innerText = "Moderate";
-          $("sbFires").innerText = "430";
-          $("sbFires").className = "font-black text-orange-500 text-sm";
-          $("sbArrival").innerText = "12–18 hrs";
-          $("sbArrival").className = "font-black text-orange-500 text-sm";
-          $("sbPmImpact").innerHTML = '+32 <span class="text-[10px]">µg/m³</span>';
-          $("sbPmImpact").className = "font-black text-orange-500 text-sm";
-          $("sbWindSummary").innerHTML = '🧭 Wind <strong class="text-slate-700 dark:text-white">NW 4 km/h</strong> → plume drifts <strong class="text-slate-700 dark:text-white">SE</strong> · ETA ≈ <strong class="text-slate-700 dark:text-white">15 hrs</strong> · peak ≈ <strong class="text-slate-700 dark:text-white">110 µg/m³</strong>';
-          $("sbProgressBar").style.width = "30%";
+          $("sbBadge").className = "text-[10px] bg-slate-500/10 text-slate-500 font-bold px-2 py-0.5 rounded-full border border-slate-500/20";
+          $("sbBadge").innerText = "No Data";
+          $("sbFires").innerText = "--";
+          $("sbFires").className = "font-black text-slate-500 text-sm";
+          $("sbArrival").innerText = "-- hrs";
+          $("sbArrival").className = "font-black text-slate-500 text-sm";
+          $("sbPmImpact").innerHTML = '-- <span class="text-[10px]">µg/m³</span>';
+          $("sbPmImpact").className = "font-black text-slate-500 text-sm";
+          $("sbWindSummary").innerHTML = '🧭 Wind <strong class="text-slate-700 dark:text-white">-- km/h</strong> → plume drifts <strong class="text-slate-700 dark:text-white">--</strong> · ETA ≈ <strong class="text-slate-700 dark:text-white">-- hrs</strong> · peak ≈ <strong class="text-slate-700 dark:text-white">-- µg/m³</strong>';
+          $("sbProgressBar").style.width = "0%";
 
           if ($("invBadge")) {
-            $("invBadge").innerText = "Moderate";
-            $("invBadge").className = "text-[10px] font-bold text-pink-500 dark:text-pink-400 uppercase tracking-wider";
+            $("invBadge").innerText = "No Data";
+            $("invBadge").className = "text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider";
           }
           if ($("weatherTitle")) $("weatherTitle").innerText = "24h Avg Weather";
         } else {
-          $("sbBadge").className = "text-[10px] bg-red-500/10 text-red-500 font-bold px-2 py-0.5 rounded-full border border-red-500/20";
-          $("sbBadge").innerText = "High";
-          $("sbFires").innerText = "1,284";
-          $("sbFires").className = "font-black text-orange-500 text-sm"; // Original color
-          $("sbArrival").innerText = "54–66 hrs";
-          $("sbArrival").className = "font-black text-red-500 text-sm";
-          $("sbPmImpact").innerHTML = '+86 <span class="text-[10px]">µg/m³</span>';
-          $("sbPmImpact").className = "font-black text-red-500 text-sm";
-          $("sbWindSummary").innerHTML = '🧭 Wind <strong class="text-slate-700 dark:text-white">W 2 km/h</strong> → plume drifts <strong class="text-slate-700 dark:text-white">E</strong> · ETA ≈ <strong class="text-slate-700 dark:text-white">60 hrs</strong> · peak ≈ <strong class="text-slate-700 dark:text-white">204 µg/m³</strong>';
-          $("sbProgressBar").style.width = "65%";
+          $("sbBadge").className = "text-[10px] bg-slate-500/10 text-slate-500 font-bold px-2 py-0.5 rounded-full border border-slate-500/20";
+          $("sbBadge").innerText = "No Data";
+          $("sbFires").innerText = "--";
+          $("sbFires").className = "font-black text-slate-500 text-sm";
+          $("sbArrival").innerText = "-- hrs";
+          $("sbArrival").className = "font-black text-slate-500 text-sm";
+          $("sbPmImpact").innerHTML = '-- <span class="text-[10px]">µg/m³</span>';
+          $("sbPmImpact").className = "font-black text-slate-500 text-sm";
+          $("sbWindSummary").innerHTML = '🧭 Wind <strong class="text-slate-700 dark:text-white">-- km/h</strong> → plume drifts <strong class="text-slate-700 dark:text-white">--</strong> · ETA ≈ <strong class="text-slate-700 dark:text-white">-- hrs</strong> · peak ≈ <strong class="text-slate-700 dark:text-white">-- µg/m³</strong>';
+          $("sbProgressBar").style.width = "0%";
 
           if ($("invBadge")) {
-            $("invBadge").innerText = "Active";
-            $("invBadge").className = "text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider";
+            $("invBadge").innerText = "No Data";
+            $("invBadge").className = "text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider";
           }
           if ($("weatherTitle")) $("weatherTitle").innerText = "Weather & Wind";
         }
