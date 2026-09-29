@@ -3168,7 +3168,7 @@
     const isDark = () => document.documentElement.classList.contains("dark");
 
     // REPLACE THIS URL WITH YOUR ACTUAL AWS API DOMAIN OR IP
-    const BACKEND_URL = "http://YOUR_AWS_BACKEND_IP_OR_DOMAIN:8000";
+    const BACKEND_URL = "http://32.196.37.69:3000";
 
     const stations = [
       { name: "Anand Vihar", area: "East Delhi", lat: 28.6469, lng: 77.3152 },
@@ -4660,8 +4660,7 @@
     /* =====================================================
  7. DATA — REAL-TIME BACKEND INTEGRATION (Vital 2.0 API)
 ===================================================== */
-    // REPLACE THIS URL WITH YOUR ACTUAL AWS API DOMAIN OR IP
-    const BACKEND_URL = "http://YOUR_AWS_BACKEND_IP_OR_DOMAIN:8000";
+    // Backend URL is defined globally at the top of the file
 
     async function fetchRealData() {
       try {
