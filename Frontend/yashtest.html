@@ -3548,19 +3548,19 @@
         // 1. Fetch Weather Data for Wind
         const weatherApiKey = "a258f518f1714d3a90e164530261809";
         const wxUrl = `https://api.weatherapi.com/v1/current.json?key=${weatherApiKey}&q=Karnal`;
-        let windDegree = 315;
-        let windKph = 10;
-        let windDir = "NW";
+        let windDegree = null;
+        let windKph = null;
+        let windDir = "--";
 
         try {
           const wxRes = await fetch(wxUrl);
           if (wxRes.ok) {
             const wxData = await wxRes.json();
             windDegree = wxData.current.wind_degree;
-            windKph = wxData.current.wind_kph || 10;
+            windKph = wxData.current.wind_kph;
             windDir = wxData.current.wind_dir;
           }
-        } catch (e) { console.warn("Weather API failed, using defaults", e); }
+        } catch (e) { console.warn("Weather API failed", e); }
 
         // Smoke blows exactly downwind from source
         const smokeCompassDir = (windDegree + 180) % 360;
@@ -3591,25 +3591,7 @@
         }
 
         if (fires.length === 0) {
-          // Hardcoded real fire hotspots around Delhi NCR (Punjab/Haryana stubble burning belt)
-          const fallbackFires = [
-            // Punjab stubble burning — primary source
-            { lat: 30.24, lng: 75.84, frp: 87, sat: 'VIIRS', inst: 'VIIRS', date: 'Today', time: '0530' },
-            { lat: 30.58, lng: 76.11, frp: 62, sat: 'AQUA', inst: 'MODIS', date: 'Today', time: '0715' },
-            { lat: 30.72, lng: 75.43, frp: 110, sat: 'VIIRS', inst: 'VIIRS', date: 'Today', time: '0530' },
-            { lat: 30.45, lng: 76.60, frp: 55, sat: 'TERRA', inst: 'MODIS', date: 'Today', time: '0600' },
-            { lat: 31.02, lng: 75.20, frp: 145, sat: 'VIIRS', inst: 'VIIRS', date: 'Today', time: '0545' },
-            { lat: 30.15, lng: 75.35, frp: 78, sat: 'AQUA', inst: 'MODIS', date: 'Today', time: '0700' },
-            // Haryana stubble burning
-            { lat: 29.68, lng: 76.99, frp: 48, sat: 'VIIRS', inst: 'VIIRS', date: 'Today', time: '0620' },
-            { lat: 29.90, lng: 76.50, frp: 70, sat: 'AQUA', inst: 'MODIS', date: 'Today', time: '0730' },
-            { lat: 29.45, lng: 77.20, frp: 38, sat: 'VIIRS', inst: 'VIIRS', date: 'Today', time: '0545' },
-            { lat: 29.30, lng: 76.80, frp: 92, sat: 'TERRA', inst: 'MODIS', date: 'Today', time: '0610' },
-            // NCR outskirts / UP border
-            { lat: 28.95, lng: 77.55, frp: 32, sat: 'VIIRS', inst: 'VIIRS', date: 'Today', time: '0635' },
-            { lat: 28.82, lng: 77.72, frp: 27, sat: 'AQUA',  inst: 'MODIS',  date: 'Today', time: '0720' },
-          ];
-          fallbackFires.forEach(f => fires.push(f));
+          // No fallback fires added.
         }
 
         const delhiLL = [28.6139, 77.2090];
@@ -4737,37 +4719,7 @@
           }
         }
 
-        // If backend returned insufficient data (<24 pts), generate a realistic 72-hour synthetic
-        // diurnal curve so 24h / 72h toggles always show visually distinct data.
-        // Marked as estimated in the UI via console warn above.
-        if (fcTimes.length < 24) {
-          const basePm25 = fcPm25.length > 0 ? fcPm25[0] : 65;
-          const basePm10 = fcPm10.length > 0 ? fcPm10[0] : 110;
-          const baseNo2  = fcNo2.length  > 0 ? fcNo2[0]  : 25;
-          const baseO3   = fcO3.length   > 0 ? fcO3[0]   : 35;
-          const baseAqi  = fcAqi.length  > 0 ? fcAqi[0]  : 100;
-          fcTimes.length = 0; fcPm25.length = 0; fcPm10.length = 0;
-          fcNo2.length = 0; fcO3.length = 0; fcAqi.length = 0; fcCo.length = 0;
-          // 72-point diurnal pattern: peaks at 8am & 8pm, troughs at 3am & 2pm
-          for (let h = 0; h < 72; h++) {
-            const d = new Date(now.getTime() + h * 3600000);
-            fcTimes.push(d.toISOString().slice(0, 16));
-            const hOfDay = d.getHours();
-            // Two daily peaks: morning rush (8h) and evening (20h)
-            const diurnal = 0.6 + 0.4 * (Math.pow(Math.sin((hOfDay - 8) * Math.PI / 12), 2) +
-                                          0.5 * Math.pow(Math.sin((hOfDay - 20) * Math.PI / 12), 2));
-            // Mild day-to-day degradation over 72h (pollution builds up)
-            const dayFactor = 1 + (h / 72) * 0.18;
-            // Small random noise per hour for realism
-            const noise = 1 + (Math.sin(h * 7.3) * 0.06 + Math.cos(h * 4.1) * 0.04);
-            fcPm25.push(Math.round(basePm25 * diurnal * dayFactor * noise));
-            fcPm10.push(Math.round(basePm10 * diurnal * dayFactor * noise));
-            fcNo2.push(Math.round(baseNo2 * diurnal * noise));
-            fcO3.push(Math.round(baseO3 * (1.1 - 0.2 * diurnal) * noise)); // O3 inversely diurnal
-            fcAqi.push(Math.round(baseAqi * diurnal * dayFactor * noise));
-            fcCo.push(Math.round(800 * diurnal * noise));
-          }
-        }
+        // Removed fallback synthetic diurnal curve. Only genuine API data is kept.
 
         // 2. Fetch live data for each station from /api/live?lat=...&lng=...
         const livePromises = stations.map(s =>
@@ -4782,25 +4734,22 @@
         const wxData = [];
 
         stations.forEach((s, idx) => {
-          const live = liveResults[idx] || (liveResults.find(r => r != null) || {});
+          const live = liveResults[idx] || {};
           const curTime = live.timestamp || now.toISOString().slice(0, 16);
 
-          // Station-specific variance ratio so stations reflect localized geographic spread
-          const stVariance = 1 + ((idx - 4) * 0.04);
+          const curAqi = live.aqi != null ? Math.round(live.aqi) : null;
+          const curPm25 = live.pm25 != null ? Math.round(live.pm25) : null;
+          const curPm10 = live.pm10 != null ? Math.round(live.pm10) : null;
+          const curO3 = live.o3 != null ? Math.round(live.o3) : null;
+          const curNo2 = live.no2 != null ? Math.round(live.no2) : null;
 
-          const curAqi = live.aqi != null ? Math.round(live.aqi * stVariance) : 100;
-          const curPm25 = live.pm25 != null ? Math.round(live.pm25 * stVariance) : 65;
-          const curPm10 = live.pm10 != null ? Math.round(live.pm10 * stVariance) : 110;
-          const curO3 = live.o3 != null ? Math.round(live.o3) : 35;
-          const curNo2 = live.no2 != null ? Math.round(live.no2) : 25;
-
-          // Hourly series scaled for each station from the backend 72h forecast
+          // Hourly series from the backend 72h forecast
           const stationHourlyTimes = fcTimes.length > 0 ? fcTimes : [curTime];
-          const stationHourlyPm25 = fcPm25.length > 0 ? fcPm25.map(v => Math.round(v * stVariance)) : [curPm25];
-          const stationHourlyPm10 = fcPm10.length > 0 ? fcPm10.map(v => Math.round(v * stVariance)) : [curPm10];
+          const stationHourlyPm25 = fcPm25.length > 0 ? fcPm25.map(v => Math.round(v)) : [curPm25];
+          const stationHourlyPm10 = fcPm10.length > 0 ? fcPm10.map(v => Math.round(v)) : [curPm10];
           const stationHourlyNo2 = fcNo2.length > 0 ? fcNo2.map(v => Math.round(v)) : [curNo2];
           const stationHourlyO3 = fcO3.length > 0 ? fcO3.map(v => Math.round(v)) : [curO3];
-          const stationHourlyAqi = fcAqi.length > 0 ? fcAqi.map(v => Math.round(v * stVariance)) : [curAqi];
+          const stationHourlyAqi = fcAqi.length > 0 ? fcAqi.map(v => Math.round(v)) : [curAqi];
 
           aqiData.push({
             current: {
@@ -4810,7 +4759,7 @@
               ozone: curO3,
               nitrogen_dioxide: curNo2,
               european_aqi: curAqi,
-              pbl_height_m: live.pbl_height_m || 200,
+              pbl_height_m: live.pbl_height_m || null,
             },
             hourly: {
               time: stationHourlyTimes,
@@ -4824,11 +4773,11 @@
 
           wxData.push({
             current: {
-              temperature_2m: live.temperature_C != null ? Math.round(live.temperature_C) : 28,
-              relative_humidity_2m: live.humidity != null ? Math.round(live.humidity) : 65,
-              wind_speed_10m: live.wind_speed != null ? Math.round(live.wind_speed) : 8,
-              wind_direction_10m: live.wind_direction != null ? Math.round(live.wind_direction) : 300,
-              pbl_height_m: live.pbl_height_m || 200,
+              temperature_2m: live.temperature_C != null ? Math.round(live.temperature_C) : null,
+              relative_humidity_2m: live.humidity != null ? Math.round(live.humidity) : null,
+              wind_speed_10m: live.wind_speed != null ? Math.round(live.wind_speed) : null,
+              wind_direction_10m: live.wind_direction != null ? Math.round(live.wind_direction) : null,
+              pbl_height_m: live.pbl_height_m || null,
               precipitation: 0,
             },
           });
@@ -5722,16 +5671,18 @@
           function syncAerolensWithBackend(fcData, liveData) {
             try {
               if (liveData) {
-                STATES[0].aqi = Math.round(liveData.aqi || 86);
-                STATES[0].pm25 = Math.round(liveData.pm25 || 105);
-                STATES[0].surfaceTemp = liveData.temperature_C != null ? liveData.temperature_C : 28.9;
-                STATES[0].humidity = liveData.humidity != null ? liveData.humidity : 67;
-                STATES[0].windSpeed = liveData.wind_speed != null ? liveData.wind_speed / 3.6 : 1.5;
-                STATES[0].windDir = liveData.wind_direction != null ? liveData.wind_direction : 120;
-                STATES[0].pblCeiling = Math.max(liveData.pbl_height_m || 190, 50);
-                STATES[0].invBase = Math.round(STATES[0].pblCeiling * 1.2);
-                STATES[0].invTop = Math.round(STATES[0].invBase + 450);
-                STATES[0].status = STATES[0].pblCeiling < 200 ? "STRONG" : STATES[0].pblCeiling < 500 ? "MODERATE" : "WEAK";
+                STATES[0].aqi = liveData.aqi != null ? Math.round(liveData.aqi) : null;
+                STATES[0].pm25 = liveData.pm25 != null ? Math.round(liveData.pm25) : null;
+                STATES[0].surfaceTemp = liveData.temperature_C != null ? liveData.temperature_C : null;
+                STATES[0].humidity = liveData.humidity != null ? liveData.humidity : null;
+                STATES[0].windSpeed = liveData.wind_speed != null ? liveData.wind_speed / 3.6 : null;
+                STATES[0].windDir = liveData.wind_direction != null ? liveData.wind_direction : null;
+                STATES[0].pblCeiling = liveData.pbl_height_m != null ? Math.max(liveData.pbl_height_m, 50) : null;
+                if (STATES[0].pblCeiling != null) {
+                  STATES[0].invBase = Math.round(STATES[0].pblCeiling * 1.2);
+                  STATES[0].invTop = Math.round(STATES[0].invBase + 450);
+                  STATES[0].status = STATES[0].pblCeiling < 200 ? "STRONG" : STATES[0].pblCeiling < 500 ? "MODERATE" : "WEAK";
+                }
               }
 
               if (fcData && Array.isArray(fcData.forecast) && fcData.forecast.length > 0) {
