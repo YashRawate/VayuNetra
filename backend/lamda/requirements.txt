@@ -1,0 +1,14 @@
+numpy
+pandas
+xarray
+netCDF4
+scipy
+matplotlib
+fastapi
+uvicorn[standard]
+python-multipart
+redis
+boto3
+httpx
+python-dotenv
+
